@@ -19,21 +19,17 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0.0'
 }
 
-apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
-apply plugin: 'com.google.gms.google-services'
-apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
-
-def keystoreProperties = new Properties()
-def keystorePropertiesFile = rootProject.file('key.properties')
-if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'com.google.gms.google-services'
+    id 'dev.flutter.flutter-gradle-plugin'
 }
 
 android {
-    namespace "com.lawyersbh.app"
-    compileSdkVersion 34
-    ndkVersion "27.0.12077973"
+    namespace 'com.lawyersbh.app'
+    compileSdk 34
+    ndkVersion '27.0.12077973'
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -45,41 +41,44 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.lawyersbh.app"
-        minSdkVersion 24
-        targetSdkVersion 34
+        applicationId 'com.lawyersbh.app'
+        minSdk 24
+        targetSdk 34
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true
     }
 
-    flavorDimensions "environment"
+    flavorDimensions 'environment'
 
     productFlavors {
         development {
-            dimension "environment"
-            applicationIdSuffix ".dev"
-            versionNameSuffix "-dev"
-            resValue "string", "app_name", "محامون البحرين (Dev)"
-            manifestPlaceholders = [appLabel: "محامون البحرين (Dev)"]
+            dimension 'environment'
+            applicationIdSuffix '.dev'
+            versionNameSuffix '-dev'
+            resValue 'string', 'app_name', 'محامون البحرين (Dev)'
+            manifestPlaceholders = [appLabel: 'محامون البحرين (Dev)']
         }
         staging {
-            dimension "environment"
-            applicationIdSuffix ".staging"
-            versionNameSuffix "-staging"
-            resValue "string", "app_name", "محامون البحرين (Staging)"
-            manifestPlaceholders = [appLabel: "محامون البحرين (Staging)"]
+            dimension 'environment'
+            applicationIdSuffix '.staging'
+            versionNameSuffix '-staging'
+            resValue 'string', 'app_name', 'محامون البحرين (Staging)'
+            manifestPlaceholders = [appLabel: 'محامون البحرين (Staging)']
         }
         production {
-            dimension "environment"
-            resValue "string", "app_name", "محامون البحرين"
-            manifestPlaceholders = [appLabel: "محامون البحرين"]
+            dimension 'environment'
+            resValue 'string', 'app_name', 'محامون البحرين'
+            manifestPlaceholders = [appLabel: 'محامون البحرين']
         }
     }
 
     signingConfigs {
         release {
+            def keystorePropertiesFile = rootProject.file('key.properties')
             if (keystorePropertiesFile.exists()) {
+                def keystoreProperties = new Properties()
+                keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
                 keyAlias keystoreProperties['keyAlias']
                 keyPassword keystoreProperties['keyPassword']
                 storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
@@ -117,8 +116,8 @@ flutter {
 }
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.0"
-    implementation "androidx.multidex:multidex:2.0.1"
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.0'
+    implementation 'androidx.multidex:multidex:2.0.1'
     implementation platform('com.google.firebase:firebase-bom:32.7.0')
     implementation 'com.google.firebase:firebase-analytics-ktx'
     implementation 'com.google.firebase:firebase-messaging-ktx'
