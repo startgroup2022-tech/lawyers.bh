@@ -1,0 +1,7 @@
+{
+  "app": { "name": "محامون البحرين", "nameEn": "Lawyers.bh" },
+  "home": { "title": "الرئيسية", "greeting": "مرحباً", "search": "ابحث عن محامٍ..." },
+  "auth": { "login": "تسجيل الدخول", "register": "إنشاء حساب", "logout": "تسجيل الخروج", "email": "البريد الإلكتروني", "phone": "رقم الهاتف", "password": "كلمة المرور", "confirmPassword": "تأكيد كلمة المرور", "forgotPassword": "نسيت كلمة المرور؟", "resetPassword": "إعادة تعيين كلمة المرور", "otp": "رمز التحقق", "verifyCode": "تحقق من الرمز", "resendCode": "إعادة إرسال الرمز", "rememberMe": "تذكرني", "orLoginWith": "أو تسجيل الدخول بـ", "dontHaveAccount": "لا تملك حساباً؟", "alreadyHaveAccount": "تملك حساباً بالفعل؟" },
+  "lawyers": { "directory": "دليل المحامين", "all": "الكل", "commercial": "تجاري", "personalStatus": "أحوال شخصية", "labor": "عمالي", "criminal": "جنائي", "experience": "سنوات خبرة", "years": "سنة", "consultationFee": "رسوم الاستشارة", "rating": "التقييم", "reviews": "تقييم", "freeFirstConsultation": "استشارة أولى مجانية", "acceptedAtCassation": "مقبول أمام التمييز", "availableToday": "متاح اليوم", "bookConsultation": "احجز استشارة" },
+  "common": { "loading": "جاري التحميل...", "error": "حدث خطأ", "retry": "إعادة المحاولة", "ok": "موافق", "cancel": "إلغاء", "save": "حفظ", "delete": "حذف", "edit": "تعديل", "search": "بحث", "filter": "تصفية", "sort": "ترتيب", "clear": "مسح", "done": "تم", "bhd": "د.ب" }
+}

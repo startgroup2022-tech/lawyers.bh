@@ -1,0 +1,7 @@
+{
+  "app": { "name": "Lawyers Bahrain", "nameEn": "Lawyers.bh" },
+  "home": { "title": "Home", "greeting": "Welcome", "search": "Search for a lawyer..." },
+  "auth": { "login": "Login", "register": "Register", "logout": "Logout", "email": "Email", "phone": "Phone", "password": "Password", "confirmPassword": "Confirm Password", "forgotPassword": "Forgot Password?", "resetPassword": "Reset Password", "otp": "OTP", "verifyCode": "Verify Code", "resendCode": "Resend Code", "rememberMe": "Remember Me", "orLoginWith": "Or login with", "dontHaveAccount": "Don't have an account?", "alreadyHaveAccount": "Already have an account?" },
+  "lawyers": { "directory": "Lawyers Directory", "all": "All", "commercial": "Commercial", "personalStatus": "Personal Status", "labor": "Labor", "criminal": "Criminal", "experience": "Years Experience", "years": "years", "consultationFee": "Consultation Fee", "rating": "Rating", "reviews": "Reviews", "freeFirstConsultation": "Free First Consultation", "acceptedAtCassation": "Accepted at Cassation", "availableToday": "Available Today", "bookConsultation": "Book Consultation" },
+  "common": { "loading": "Loading...", "error": "Error", "retry": "Retry", "ok": "OK", "cancel": "Cancel", "save": "Save", "delete": "Delete", "edit": "Edit", "search": "Search", "filter": "Filter", "sort": "Sort", "clear": "Clear", "done": "Done", "bhd": "BHD" }
+}
