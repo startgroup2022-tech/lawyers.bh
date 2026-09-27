@@ -1,0 +1,7 @@
+## This file must *NOT* be checked into version control.
+# It is used by the Flutter tool to locate your Flutter SDK.
+# Run `flutter doctor` to ensure your environment is set up correctly.
+
+flutter.sdk=/path/to/flutter
+flutter.versionName=1.0.0
+flutter.versionCode=1

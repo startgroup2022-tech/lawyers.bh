@@ -1,0 +1,6 @@
+// Staging Configuration
+#include "Release.xcconfig"
+
+PRODUCT_BUNDLE_IDENTIFIER = com.lawyersbh.app.staging
+PRODUCT_NAME = $(inherited) Staging
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon-Staging

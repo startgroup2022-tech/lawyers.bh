@@ -1,0 +1,79 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+*.dart_tool/package_config.json
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.keystore
+*.jks
+*.p12
+*.pem
+*.cert
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist
+
+# Build outputs
+*.apk
+*.aab
+*.ipa
+*.dSYM
+build/
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+android/app/build/
+android/.gradle/
+android/local.properties
+
+# Generated files
+*.g.dart
+*.freezed.dart
+*.gr.dart
+*.config.dart
+
+# Coverage
+coverage/
+*.lcov
+
+# Logs
+*.log
+flutter_*.log
+
+# Test
+.test_coverage/
+
+# CI/CD
+codemagic.yaml.local
+
+# Misc
+*.orig
+*.bak
+*.tmp
+*.temp
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/readme.md
+
+# Translation
+*.arb
+
+# Asset bundles
+.dart_tool/flutter_gen/
