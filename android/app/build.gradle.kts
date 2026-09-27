@@ -1,10 +1,22 @@
-import org.gradle.api.plugins.ExtensionAware
+import java.io.File
+import java.util.Properties
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(FileInputStream(localPropertiesFile))
+}
+
+val flutterRoot = localProperties.getProperty("flutter.sdk")
+    ?: throw GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
+
+val flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "1"
+val flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0.0"
 
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.gms.google-services")
-    id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
@@ -25,7 +37,7 @@ android {
         applicationId = "com.lawyersbh.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = flutterVersionCode.toInteger()
+        versionCode = flutterVersionCode.toInt()
         versionName = flutterVersionName
         multiDexEnabled = true
     }
@@ -94,6 +106,9 @@ android {
         isAbortOnError = false
     }
 }
+
+// Apply Flutter plugin from Flutter SDK
+apply(from = "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle")
 
 flutter {
     source = "../.."
