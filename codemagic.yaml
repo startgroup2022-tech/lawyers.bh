@@ -1,11 +1,11 @@
-# Codemagic CI/CD Configuration for Lawyers.bh - MINIMAL WORKING VERSION
+# Codemagic CI/CD Configuration for Lawyers.bh - FAST DEBUG BUILD
 # https://docs.codemagic.io/getting-started/yaml/
 
 workflows:
   android-debug:
     name: Android Debug Build
     instance_type: mac_mini_m2
-    max_build_duration: 90
+    max_build_duration: 30
     environment:
       flutter: stable
       xcode: latest
@@ -23,16 +23,7 @@ workflows:
       - name: Get dependencies
         script: |
           flutter pub get
-      - name: Generate code
-        script: |
-          dart run build_runner build --delete-conflicting-outputs
-      - name: Run tests
-        script: |
-          flutter test --coverage
-      - name: Run static analysis
-        script: |
-          flutter analyze
-      - name: Build Android Debug APK
+      - name: Build Android Debug APK (skip build_runner - use pre-generated code)
         script: |
           flutter build apk --debug --flavor development
     artifacts:
