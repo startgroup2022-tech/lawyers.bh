@@ -10,6 +10,11 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
+    cache:
+      cache_paths:
+        - .dart_tool
+        - .pub-cache
+        - $FLUTTER_ROOT/.pub-cache
     scripts:
       - name: Setup environment
         script: |
