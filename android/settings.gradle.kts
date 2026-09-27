@@ -4,6 +4,9 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
+    plugins {
+        id("dev.flutter.flutter-gradle-plugin") version "1.0.0"
+    }
 }
 
 dependencyResolutionManagement {
@@ -15,5 +18,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "lawyers_bh"
-
-include ':app'
+include(":app")
