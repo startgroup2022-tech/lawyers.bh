@@ -71,23 +71,23 @@ flutter:
   fonts:
     - family: Cairo
       fonts:
-        - asset: assets/fonts/Cairo-Regular.ttf
+        - asset: assets/fonts/Cairo-Regular.woff2
           weight: 400
-        - asset: assets/fonts/Cairo-Medium.ttf
+        - asset: assets/fonts/Cairo-Medium.woff2
           weight: 500
-        - asset: assets/fonts/Cairo-SemiBold.ttf
+        - asset: assets/fonts/Cairo-SemiBold.woff2
           weight: 600
-        - asset: assets/fonts/Cairo-Bold.ttf
+        - asset: assets/fonts/Cairo-Bold.woff2
           weight: 700
-        - asset: assets/fonts/Cairo-ExtraBold.ttf
+        - asset: assets/fonts/Cairo-ExtraBold.woff2
           weight: 800
     - family: Tajawal
       fonts:
-        - asset: assets/fonts/Tajawal-Regular.ttf
+        - asset: assets/fonts/Tajawal-Regular.woff2
           weight: 400
-        - asset: assets/fonts/Tajawal-Medium.ttf
+        - asset: assets/fonts/Tajawal-Medium.woff2
           weight: 500
-        - asset: assets/fonts/Tajawal-Bold.ttf
+        - asset: assets/fonts/Tajawal-Bold.woff2
           weight: 700
 
 flutter_native_splash:
