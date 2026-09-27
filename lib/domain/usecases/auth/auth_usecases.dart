@@ -6,8 +6,8 @@ class LoginUseCase {
 
   LoginUseCase(this._repository);
 
-  Future<User> call({required String phone, required String password}) {
-    return _repository.login(phone: phone, password: password);
+  Future<User> call({required String email, required String password}) {
+    return _repository.login(email: email, password: password);
   }
 }
 
@@ -17,18 +17,16 @@ class RegisterUseCase {
   RegisterUseCase(this._repository);
 
   Future<User> call({
-    required String phone,
     required String email,
-    required String password,
     required String fullName,
-    required UserRole role,
+    required String phone,
+    required String password,
   }) {
     return _repository.register(
-      phone: phone,
       email: email,
-      password: password,
       fullName: fullName,
-      role: role,
+      phone: phone,
+      password: password,
     );
   }
 }
@@ -58,8 +56,8 @@ class ForgotPasswordUseCase {
 
   ForgotPasswordUseCase(this._repository);
 
-  Future<void> call(String phone) {
-    return _repository.forgotPassword(phone);
+  Future<void> call(String email) {
+    return _repository.forgotPassword(email);
   }
 }
 
@@ -68,8 +66,8 @@ class VerifyOtpUseCase {
 
   VerifyOtpUseCase(this._repository);
 
-  Future<void> call({required String phone, required String code}) {
-    return _repository.verifyOtp(phone: phone, code: code);
+  Future<void> call({required String email, required String code}) {
+    return _repository.verifyOtp(email: email, code: code);
   }
 }
 

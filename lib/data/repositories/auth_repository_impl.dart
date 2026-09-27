@@ -19,16 +19,16 @@ class AuthRepositoryImpl implements AuthRepository {
         _secureStorage = secureStorage;
 
   @override
-  Future<User> login({required String phone, required String password}) async {
+  Future<User> login({required String email, required String password}) async {
     try {
       final response = await _remoteDataSource.login(
-        LoginRequestModel(phone: phone, password: password, rememberMe: true),
+        LoginRequestModel(email: email, password: password),
       );
 
-      await _secureStorage.saveAuthTokens(response.accessToken, response.refreshToken);
-      await _localDataSource.cacheUser(response.user);
+      await _secureStorage.saveAuthTokens(response.token, '');
+      await _localDataSource.cacheUser(response.client.toEntity());
 
-      return response.user.toEntity();
+      return response.client.toEntity();
     } catch (e) {
       if (e is AppException) rethrow;
       throw UnknownException(e.toString());
@@ -37,27 +37,37 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<User> register({
-    required String phone,
     required String email,
-    required String password,
     required String fullName,
+    required String phone,
+    required String password,
     required UserRole role,
   }) async {
     try {
       final response = await _remoteDataSource.register(
         RegisterRequestModel(
-          phone: phone,
           email: email,
-          password: password,
           fullName: fullName,
-          role: role.name,
+          phone: phone,
+          password: password,
+          locale: 'ar',
         ),
       );
 
-      await _secureStorage.saveAuthTokens(response.accessToken, response.refreshToken);
-      await _localDataSource.cacheUser(response.user);
-
-      return response.user.toEntity();
+      // Registration returns a challenge ID, need to verify OTP
+      return User(
+        id: '',
+        email: '',
+        phone: '',
+        fullName: '',
+        role: UserRole.client,
+        status: UserStatus.pending,
+        verificationStatus: VerificationStatus.pending,
+        createdAt: DateTime.now(),
+        notificationsEnabled: true,
+        darkMode: false,
+        preferredLanguage: 'ar',
+      );
     } catch (e) {
       if (e is AppException) rethrow;
       throw UnknownException(e.toString());
@@ -67,7 +77,10 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> logout() async {
     try {
-      await _remoteDataSource.logout();
+      final token = await _secureStorage.getAccessToken();
+      if (token != null) {
+        await _remoteDataSource.logout(token);
+      }
     } catch (_) {
       // Ignore remote logout errors
     } finally {
@@ -79,26 +92,27 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<User> refreshToken() async {
     try {
-      final refreshToken = await _secureStorage.getRefreshToken();
-      if (refreshToken == null) throw TokenExpiredException('No refresh token');
+      final token = await _secureStorage.getAccessToken();
+      if (token == null) throw TokenExpiredException('No access token');
 
-      final response = await _remoteDataSource.refreshToken(refreshToken);
-      await _secureStorage.saveAuthTokens(response.accessToken, response.refreshToken);
-
-      final user = await _remoteDataSource.getCurrentUser();
-      await _localDataSource.cacheUser(user);
-
-      return user.toEntity();
+      final session = await _remoteDataSource.getSession(token);
+      if (session.client != null) {
+        await _localDataSource.cacheUser(session.client!.toEntity());
+        return session.client!.toEntity();
+      }
+      throw TokenExpiredException('Session expired');
     } catch (e) {
       if (e is AppException) rethrow;
-      throw TokenExpiredException('Failed to refresh token');
+      throw TokenExpiredException('Failed to refresh session');
     }
   }
 
   @override
-  Future<void> forgotPassword(String phone) async {
+  Future<void> forgotPassword(String email) async {
     try {
-      await _remoteDataSource.forgotPassword(phone);
+      await _remoteDataSource.forgotPassword(
+        ForgotPasswordRequestModel(email: email, locale: 'ar'),
+      );
     } catch (e) {
       if (e is AppException) rethrow;
       throw UnknownException(e.toString());
@@ -106,10 +120,10 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<void> verifyOtp({required String phone, required String code}) async {
+  Future<void> verifyOtp({required String email, required String code}) async {
     try {
       await _remoteDataSource.verifyOtp(
-        VerifyOtpRequestModel(phone: phone, code: code),
+        VerifyOtpRequestModel(id: '', code: code),
       );
     } catch (e) {
       if (e is AppException) rethrow;
@@ -120,22 +134,15 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<User> getCurrentUser() async {
     try {
-      final cachedUser = await _localDataSource.getCachedUser();
-      if (cachedUser != null) {
-        // Try to get fresh data from server
-        try {
-          final freshUser = await _remoteDataSource.getCurrentUser();
-          await _localDataSource.cacheUser(freshUser);
-          return freshUser.toEntity();
-        } catch (_) {
-          return cachedUser.toEntity();
-        }
-      }
+      final token = await _secureStorage.getAccessToken();
+      if (token == null) throw TokenExpiredException('No access token');
 
-      // No cached user, try to get from server
-      final user = await _remoteDataSource.getCurrentUser();
-      await _localDataSource.cacheUser(user);
-      return user.toEntity();
+      final session = await _remoteDataSource.getSession(token);
+      if (session.client != null) {
+        await _localDataSource.cacheUser(session.client!.toEntity());
+        return session.client!.toEntity();
+      }
+      throw TokenExpiredException('No session');
     } catch (e) {
       if (e is AppException) rethrow;
       throw UnknownException(e.toString());
@@ -150,8 +157,17 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> updateProfile(Map<String, dynamic> data) async {
     try {
-      final user = await _remoteDataSource.updateProfile(data);
-      await _localDataSource.cacheUser(user);
+      final token = await _secureStorage.getAccessToken();
+      if (token == null) throw TokenExpiredException('No access token');
+
+      final response = await _remoteDataSource.updateProfile(
+        token,
+        UpdateProfileRequestModel(
+          fullName: data['fullName'] as String,
+          phone: data['phone'] as String,
+        ),
+      );
+      await _localDataSource.cacheUser(response.client.toEntity());
     } catch (e) {
       if (e is AppException) rethrow;
       throw UnknownException(e.toString());
@@ -161,7 +177,11 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> changePassword({required String current, required String newPassword}) async {
     try {
+      final token = await _secureStorage.getAccessToken();
+      if (token == null) throw TokenExpiredException('No access token');
+
       await _remoteDataSource.changePassword(
+        token,
         ChangePasswordRequestModel(currentPassword: current, newPassword: newPassword),
       );
     } catch (e) {

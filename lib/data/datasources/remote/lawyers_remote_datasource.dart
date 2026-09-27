@@ -2,13 +2,11 @@ import 'package:lawyers_bh/core/network/api_client.dart';
 import 'package:lawyers_bh/data/models/lawyer_models.dart';
 
 abstract class LawyersRemoteDataSource {
-  Future<LawyersListResponseModel> getLawyers({Map<String, dynamic>? query});
-  Future<LawyerModel> getLawyerDetails(String id);
-  Future<LawyersListResponseModel> searchLawyers(String query, {Map<String, dynamic>? filters});
-  Future<LawyersListResponseModel> getRecommendedLawyers({int limit = 10});
-  Future<LawyersListResponseModel> getLawyersBySpecialty(String specialty, {int limit = 20});
-  Future<void> toggleFavorite(String lawyerId);
-  Future<LawyersListResponseModel> getFavoriteLawyers();
+  Future<LawyersListMobileResponseModel> getLawyersMobile({String countryCode = 'BH'});
+  Future<LawyerDetailResponseModel> getLawyerDetails(String id);
+  Future<LawyersListMobileResponseModel> searchLawyers(String query, {String countryCode = 'BH'});
+  Future<LawyerModel> getLawyerProfile();
+  Future<void> updateLocation(String lawyerId, double latitude, double longitude);
 }
 
 class LawyersRemoteDataSourceImpl implements LawyersRemoteDataSource {
@@ -17,44 +15,43 @@ class LawyersRemoteDataSourceImpl implements LawyersRemoteDataSource {
   LawyersRemoteDataSourceImpl(this._apiClient);
 
   @override
-  Future<LawyersListResponseModel> getLawyers({Map<String, dynamic>? query}) async {
-    final response = await _apiClient.get('/lawyers', queryParameters: query);
-    return LawyersListResponseModel.fromJson(response.data);
+  Future<LawyersListMobileResponseModel> getLawyersMobile({String countryCode = 'BH'}) async {
+    final response = await _apiClient.get(
+      '/api/mobile/lawyers',
+      queryParameters: {'countryCode': countryCode},
+    );
+    return LawyersListMobileResponseModel.fromJson(response.data);
   }
 
   @override
-  Future<LawyerModel> getLawyerDetails(String id) async {
-    final response = await _apiClient.get('/lawyers/$id');
-    return LawyerModel.fromJson(response.data);
+  Future<LawyerDetailResponseModel> getLawyerDetails(String id) async {
+    final response = await _apiClient.get('/api/lawyers/$id');
+    return LawyerDetailResponseModel.fromJson(response.data);
   }
 
   @override
-  Future<LawyersListResponseModel> searchLawyers(String query, {Map<String, dynamic>? filters}) async {
-    final params = {'q': query, ...?filters};
-    final response = await _apiClient.get('/lawyers/search', queryParameters: params);
-    return LawyersListResponseModel.fromJson(response.data);
+  Future<LawyersListMobileResponseModel> searchLawyers(String query, {String countryCode = 'BH'}) async {
+    final params = {'q': query, 'countryCode': countryCode};
+    final response = await _apiClient.get('/api/mobile/lawyers/search', queryParameters: params);
+    return LawyersListMobileResponseModel.fromJson(response.data);
   }
 
   @override
-  Future<LawyersListResponseModel> getRecommendedLawyers({int limit = 10}) async {
-    final response = await _apiClient.get('/lawyers/recommended', queryParameters: {'limit': limit});
-    return LawyersListResponseModel.fromJson(response.data);
+  Future<LawyerModel> getLawyerProfile() async {
+    final response = await _apiClient.get('/api/mobile/lawyer/profile');
+    final data = response.data['data'] as Map<String, dynamic>? ?? response.data;
+    return LawyerModel.fromJson(data);
   }
 
   @override
-  Future<LawyersListResponseModel> getLawyersBySpecialty(String specialty, {int limit = 20}) async {
-    final response = await _apiClient.get('/lawyers/specialty/$specialty', queryParameters: {'limit': limit});
-    return LawyersListResponseModel.fromJson(response.data);
-  }
-
-  @override
-  Future<void> toggleFavorite(String lawyerId) async {
-    await _apiClient.post('/lawyers/$lawyerId/favorite');
-  }
-
-  @override
-  Future<LawyersListResponseModel> getFavoriteLawyers() async {
-    final response = await _apiClient.get('/lawyers/favorites');
-    return LawyersListResponseModel.fromJson(response.data);
+  Future<void> updateLocation(String lawyerId, double latitude, double longitude) async {
+    await _apiClient.put(
+      '/api/lawyers/location',
+      data: {
+        'lawyerId': lawyerId,
+        'latitude': latitude,
+        'longitude': longitude,
+      },
+    );
   }
 }

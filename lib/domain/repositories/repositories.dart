@@ -8,18 +8,17 @@ import 'package:lawyers_bh/domain/entities/appointment.dart';
 import 'package:lawyers_bh/core/errors/exceptions.dart';
 
 abstract class AuthRepository {
-  Future<User> login({required String phone, required String password});
+  Future<User> login({required String email, required String password});
   Future<User> register({
-    required String phone,
     required String email,
-    required String password,
     required String fullName,
-    required UserRole role,
+    required String phone,
+    required String password,
   });
   Future<void> logout();
   Future<User> refreshToken();
-  Future<void> forgotPassword(String phone);
-  Future<void> verifyOtp({required String phone, required String code});
+  Future<void> forgotPassword(String email);
+  Future<void> verifyOtp({required String email, required String code});
   Future<User> getCurrentUser();
   Future<bool> isLoggedIn();
   Future<void> updateProfile(Map<String, dynamic> data);

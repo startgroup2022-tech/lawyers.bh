@@ -15,6 +15,8 @@ class AuthState {
   final bool isAuthenticated;
   final String? error;
   final AuthFlow flow;
+  final String? pendingEmail;
+  final String? pendingChallengeId;
 
   const AuthState({
     this.user,
@@ -22,6 +24,8 @@ class AuthState {
     this.isAuthenticated = false,
     this.error,
     this.flow = AuthFlow.initial,
+    this.pendingEmail,
+    this.pendingChallengeId,
   });
 
   AuthState copyWith({
@@ -30,6 +34,8 @@ class AuthState {
     bool? isAuthenticated,
     String? error,
     AuthFlow? flow,
+    String? pendingEmail,
+    String? pendingChallengeId,
   }) {
     return AuthState(
       user: user ?? this.user,
@@ -37,11 +43,13 @@ class AuthState {
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       error: error,
       flow: flow ?? this.flow,
+      pendingEmail: pendingEmail ?? this.pendingEmail,
+      pendingChallengeId: pendingChallengeId ?? this.pendingChallengeId,
     );
   }
 }
 
-enum AuthFlow { initial, login, register, forgotPassword, otp, verified, authenticated }
+enum AuthFlow { initial, login, register, registerOtp, forgotPassword, otp, verified, authenticated }
 
 class AuthProvider extends StateNotifier<AuthState> {
   final LoginUseCase _loginUseCase;
@@ -89,10 +97,10 @@ class AuthProvider extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> login({required String phone, required String password}) async {
+  Future<void> login({required String email, required String password}) async {
     state = state.copyWith(isLoading: true, error: null, flow: AuthFlow.login);
     try {
-      final user = await _loginUseCase(phone: phone, password: password);
+      final user = await _loginUseCase(email: email, password: password);
       state = state.copyWith(
         user: user,
         isAuthenticated: true,
@@ -109,26 +117,24 @@ class AuthProvider extends StateNotifier<AuthState> {
   }
 
   Future<void> register({
-    required String phone,
     required String email,
-    required String password,
     required String fullName,
-    required UserRole role,
+    required String phone,
+    required String password,
   }) async {
     state = state.copyWith(isLoading: true, error: null, flow: AuthFlow.register);
     try {
-      final user = await _registerUseCase(
-        phone: phone,
+      final response = await _registerUseCase(
         email: email,
-        password: password,
         fullName: fullName,
-        role: role,
+        phone: phone,
+        password: password,
       );
+      // Registration returns challenge ID, need to verify OTP
       state = state.copyWith(
-        user: user,
-        isAuthenticated: true,
         isLoading: false,
-        flow: AuthFlow.authenticated,
+        flow: AuthFlow.registerOtp,
+        pendingEmail: email,
       );
     } on AppException catch (e) {
       state = state.copyWith(isLoading: false, error: e.message, flow: AuthFlow.register);
@@ -139,11 +145,29 @@ class AuthProvider extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> forgotPassword(String phone) async {
+  Future<void> verifyRegisterOtp({required String code}) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final email = state.pendingEmail ?? '';
+      if (email.isEmpty) throw AppException('Email not found');
+
+      // The verifyOtpUseCase is used for both registration and forgot password
+      await _verifyOtpUseCase(email: email, code: code);
+      state = state.copyWith(isLoading: false, flow: AuthFlow.verified);
+    } on AppException catch (e) {
+      state = state.copyWith(isLoading: false, error: e.message, flow: AuthFlow.registerOtp);
+      rethrow;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: 'حدث خطأ غير متوقع', flow: AuthFlow.registerOtp);
+      rethrow;
+    }
+  }
+
+  Future<void> forgotPassword(String email) async {
     state = state.copyWith(isLoading: true, error: null, flow: AuthFlow.forgotPassword);
     try {
-      await _forgotPasswordUseCase(phone);
-      state = state.copyWith(isLoading: false, flow: AuthFlow.otp);
+      await _forgotPasswordUseCase(email);
+      state = state.copyWith(isLoading: false, flow: AuthFlow.otp, pendingEmail: email);
     } on AppException catch (e) {
       state = state.copyWith(isLoading: false, error: e.message, flow: AuthFlow.forgotPassword);
       rethrow;
@@ -153,10 +177,10 @@ class AuthProvider extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> verifyOtp({required String phone, required String code}) async {
+  Future<void> verifyOtp({required String email, required String code}) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      await _verifyOtpUseCase(phone: phone, code: code);
+      await _verifyOtpUseCase(email: email, code: code);
       state = state.copyWith(isLoading: false, flow: AuthFlow.verified);
     } on AppException catch (e) {
       state = state.copyWith(isLoading: false, error: e.message, flow: AuthFlow.otp);

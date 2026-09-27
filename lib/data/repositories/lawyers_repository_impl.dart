@@ -11,28 +11,12 @@ class LawyersRepositoryImpl implements LawyersRepository {
   @override
   Future<List<Lawyer>> getLawyers({LawyerFilter? filter}) async {
     try {
-      final query = <String, dynamic>{};
-      if (filter != null) {
-        if (filter.specialty != null) query['specialty'] = filter.specialty;
-        if (filter.location != null) query['location'] = filter.location;
-        if (filter.minRating != null) query['min_rating'] = filter.minRating;
-        if (filter.maxFee != null) query['max_fee'] = filter.maxFee;
-        if (filter.minExperience != null) query['min_experience'] = filter.minExperience;
-        if (filter.consultationTypes != null && filter.consultationTypes!.isNotEmpty) {
-          query['consultation_types'] = filter.consultationTypes!.map((e) => e.name).join(',');
-        }
-        if (filter.badges != null && filter.badges!.isNotEmpty) {
-          query['badges'] = filter.badges!.map((e) => e.name).join(',');
-        }
-        if (filter.searchQuery != null && filter.searchQuery!.isNotEmpty) {
-          query['search'] = filter.searchQuery;
-        }
-        query['page'] = filter.page;
-        query['limit'] = filter.limit;
-      }
-
-      final response = await _remoteDataSource.getLawyers(query: query);
-      return response.data.map((e) => e.toEntity()).toList();
+      final countryCode = filter?.location ?? 'BH';
+      final response = await _remoteDataSource.getLawyersMobile(countryCode: countryCode);
+      return response.data
+          .where((e) => !e.isReviewAccount)
+          .map((e) => e.toEntity())
+          .toList();
     } catch (e) {
       if (e is AppException) rethrow;
       throw UnknownException(e.toString());
@@ -42,8 +26,8 @@ class LawyersRepositoryImpl implements LawyersRepository {
   @override
   Future<Lawyer> getLawyerDetails(String id) async {
     try {
-      final model = await _remoteDataSource.getLawyerDetails(id);
-      return model.toEntity();
+      final response = await _remoteDataSource.getLawyerDetails(id);
+      return response.data.toEntity();
     } catch (e) {
       if (e is AppException) rethrow;
       throw UnknownException(e.toString());
@@ -53,7 +37,8 @@ class LawyersRepositoryImpl implements LawyersRepository {
   @override
   Future<List<Lawyer>> searchLawyers(String query, {LawyerFilter? filter}) async {
     try {
-      final response = await _remoteDataSource.searchLawyers(query, filters: filter?.toJson());
+      final countryCode = filter?.location ?? 'BH';
+      final response = await _remoteDataSource.searchLawyers(query, countryCode: countryCode);
       return response.data.map((e) => e.toEntity()).toList();
     } catch (e) {
       if (e is AppException) rethrow;
@@ -64,8 +49,12 @@ class LawyersRepositoryImpl implements LawyersRepository {
   @override
   Future<List<Lawyer>> getRecommendedLawyers({int limit = 10}) async {
     try {
-      final response = await _remoteDataSource.getRecommendedLawyers(limit: limit);
-      return response.data.map((e) => e.toEntity()).toList();
+      final response = await _remoteDataSource.getLawyersMobile(countryCode: 'BH');
+      return response.data
+          .where((e) => !e.isReviewAccount)
+          .take(limit)
+          .map((e) => e.toEntity())
+          .toList();
     } catch (e) {
       if (e is AppException) rethrow;
       throw UnknownException(e.toString());
@@ -75,8 +64,12 @@ class LawyersRepositoryImpl implements LawyersRepository {
   @override
   Future<List<Lawyer>> getLawyersBySpecialty(String specialty, {int limit = 20}) async {
     try {
-      final response = await _remoteDataSource.getLawyersBySpecialty(specialty, limit: limit);
-      return response.data.map((e) => e.toEntity()).toList();
+      final response = await _remoteDataSource.getLawyersMobile(countryCode: 'BH');
+      return response.data
+          .where((e) => !e.isReviewAccount && e.subscriptionType == specialty)
+          .take(limit)
+          .map((e) => e.toEntity())
+          .toList();
     } catch (e) {
       if (e is AppException) rethrow;
       throw UnknownException(e.toString());
@@ -86,7 +79,8 @@ class LawyersRepositoryImpl implements LawyersRepository {
   @override
   Future<void> toggleFavorite(String lawyerId) async {
     try {
-      await _remoteDataSource.toggleFavorite(lawyerId);
+      // Not available in mobile API yet
+      throw UnsupportedError('toggleFavorite not available in mobile API');
     } catch (e) {
       if (e is AppException) rethrow;
       throw UnknownException(e.toString());
@@ -96,8 +90,8 @@ class LawyersRepositoryImpl implements LawyersRepository {
   @override
   Future<List<Lawyer>> getFavoriteLawyers() async {
     try {
-      final response = await _remoteDataSource.getFavoriteLawyers();
-      return response.data.map((e) => e.toEntity()).toList();
+      // Not available in mobile API yet
+      return [];
     } catch (e) {
       if (e is AppException) rethrow;
       throw UnknownException(e.toString());
