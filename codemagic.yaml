@@ -118,11 +118,6 @@ workflows:
         credentials: $GCLOUD_SERVICE_ACCOUNT_KEY
         track: production
         submit_as_draft: false
-        release_notes: |
-          Release ${{Codemagic_BUILD_NUMBER}}
-          
-          Changes:
-          - Check GitHub releases for details
       email:
         recipients:
           - release-team@lawyers.bh
