@@ -10,6 +10,13 @@
 # `android_signing`/`ios_signing` (injected as CM_KEYSTORE_* / profiles), and
 # the production API host comes from the encrypted `API_BASE_URL` group
 # variable. See flutter_app/README.md for the exact setup steps.
+#
+# Instance type: `mac_mini_m2` is the only machine available on the free plan
+# (500 macOS minutes/month). `linux_x2`, `linux_x4`, `windows_x2` and
+# `mac_mini_m4` require billing enabled and fail with "The selected instance
+# type is not available with this current billing plan/balance." Do not switch
+# to a Linux machine unless billing is added — Linux/Windows minutes are not
+# free either.
 
 workflows:
   # ------------------------------------------------------------------
@@ -20,7 +27,7 @@ workflows:
   android-debug:
     name: Android - Debug APK (no signing required)
     max_build_duration: 30
-    instance_type: linux_x2
+    instance_type: mac_mini_m2
     environment:
       flutter: stable
     scripts:
@@ -58,7 +65,7 @@ workflows:
   android-release:
     name: Android - Release APK + AAB (signed)
     max_build_duration: 30
-    instance_type: linux_x2
+    instance_type: mac_mini_m2
     environment:
       flutter: stable
       android_signing:
