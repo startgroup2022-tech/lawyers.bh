@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/lawyer.dart';
 import '../providers/app_state.dart';
+import '../services/auth_gate.dart';
 import '../theme/app_theme.dart';
 import 'contract_payment_screen.dart';
-import 'login_otp_screen.dart';
 
 const _consultTypes = [
   {'key': 'video', 'label': 'فيديو', 'icon': Icons.videocam_outlined},
@@ -34,7 +34,7 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
   Future<void> _bookConsultation(Lawyer lawyer) async {
     final appState = context.read<AppState>();
     if (!appState.isLoggedIn) {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginOtpScreen()));
+      await promptSignIn(context, feature: 'حجز استشارة');
       return;
     }
     setState(() => _booking = true);
@@ -45,12 +45,14 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
       );
       if (!mounted) return;
       Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => ContractPaymentScreen(contractId: contractId, caseId: caseId)),
+        MaterialPageRoute(
+            builder: (_) =>
+                ContractPaymentScreen(contractId: contractId, caseId: caseId)),
       );
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('تعذّر إتمام الحجز، حاول مرة أخرى')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تعذّر إتمام الحجز، حاول مرة أخرى')));
       }
     } finally {
       if (mounted) setState(() => _booking = false);
@@ -65,7 +67,8 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
         future: _future,
         builder: (context, snap) {
           if (!snap.hasData) {
-            return const SafeArea(child: Center(child: CircularProgressIndicator()));
+            return const SafeArea(
+                child: Center(child: CircularProgressIndicator()));
           }
           final l = snap.data!;
           return CustomScrollView(
@@ -74,7 +77,8 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
                   decoration: const BoxDecoration(
-                    gradient: LinearGradient(colors: [AppColors.navy, AppColors.navyLight]),
+                    gradient: LinearGradient(
+                        colors: [AppColors.navy, AppColors.navyLight]),
                   ),
                   child: SafeArea(
                     bottom: false,
@@ -86,9 +90,13 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.arrow_forward, size: 16, color: Color(0xFFCBD5E1)),
+                              const Icon(Icons.arrow_forward,
+                                  size: 16, color: Color(0xFFCBD5E1)),
                               const SizedBox(width: 6),
-                              Text('رجوع', style: AppTextStyles.tajawal(size: 13, color: const Color(0xFFCBD5E1))),
+                              Text('رجوع',
+                                  style: AppTextStyles.tajawal(
+                                      size: 13,
+                                      color: const Color(0xFFCBD5E1))),
                             ],
                           ),
                         ),
@@ -98,18 +106,25 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
                             radius: 33,
                             backgroundColor: Colors.white,
                             child: Text(l.initials,
-                                style: AppTextStyles.cairo(size: 20, weight: FontWeight.w800, color: AppColors.navy)),
+                                style: AppTextStyles.cairo(
+                                    size: 20,
+                                    weight: FontWeight.w800,
+                                    color: AppColors.navy)),
                           ),
                         ),
                         const SizedBox(height: 8),
                         Center(
                           child: Text(l.name,
-                              style: AppTextStyles.cairo(size: 16, weight: FontWeight.w800, color: Colors.white)),
+                              style: AppTextStyles.cairo(
+                                  size: 16,
+                                  weight: FontWeight.w800,
+                                  color: Colors.white)),
                         ),
                         const SizedBox(height: 3),
                         Center(
                           child: Text('${l.categoryName} · ${l.location}',
-                              style: AppTextStyles.tajawal(size: 11.5, color: const Color(0xFFC9D3E4))),
+                              style: AppTextStyles.tajawal(
+                                  size: 11.5, color: const Color(0xFFC9D3E4))),
                         ),
                       ],
                     ),
@@ -132,7 +147,8 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
                         children: [
                           _stat('★ ${l.rating}', '${l.reviewsCount} تقييم'),
                           _stat('${l.experienceYears}', 'سنة خبرة'),
-                          _stat('${l.consultationFee.toStringAsFixed(0)} د.ب', 'الاستشارة'),
+                          _stat('${l.consultationFee.toStringAsFixed(0)} د.ب',
+                              'الاستشارة'),
                         ],
                       ),
                     ),
@@ -158,20 +174,28 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
                             runSpacing: 6,
                             children: l.tags
                                 .map((t) => Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 5),
                                       decoration: BoxDecoration(
                                         color: AppColors.bg,
-                                        border: Border.all(color: AppColors.line),
+                                        border:
+                                            Border.all(color: AppColors.line),
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Text(t,
-                                          style: AppTextStyles.tajawal(size: 11, color: AppColors.navyLight)),
+                                          style: AppTextStyles.tajawal(
+                                              size: 11,
+                                              color: AppColors.navyLight)),
                                     ))
                                 .toList(),
                           ),
                           if (l.bio != null) ...[
                             const SizedBox(height: 10),
-                            Text(l.bio!, style: AppTextStyles.tajawal(size: 12.5, color: AppColors.ink2, height: 1.7)),
+                            Text(l.bio!,
+                                style: AppTextStyles.tajawal(
+                                    size: 12.5,
+                                    color: AppColors.ink2,
+                                    height: 1.7)),
                           ],
                           const SizedBox(height: 14),
                           Row(
@@ -187,7 +211,11 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Text('نوع الاستشارة', style: AppTextStyles.cairo(size: 14.5, weight: FontWeight.w800, color: AppColors.navy)),
+                    Text('نوع الاستشارة',
+                        style: AppTextStyles.cairo(
+                            size: 14.5,
+                            weight: FontWeight.w800,
+                            color: AppColors.navy)),
                     const SizedBox(height: 10),
                     Row(
                       children: _consultTypes.map((c) {
@@ -196,22 +224,35 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
                           child: Padding(
                             padding: const EdgeInsets.only(left: 8),
                             child: InkWell(
-                              onTap: () => setState(() => _consultType = c['key'] as String),
+                              onTap: () => setState(
+                                  () => _consultType = c['key'] as String),
                               borderRadius: BorderRadius.circular(20),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 9),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 9),
                                 decoration: BoxDecoration(
-                                  color: selected ? AppColors.navy : Colors.white,
-                                  border: Border.all(color: selected ? AppColors.navy : AppColors.line),
+                                  color:
+                                      selected ? AppColors.navy : Colors.white,
+                                  border: Border.all(
+                                      color: selected
+                                          ? AppColors.navy
+                                          : AppColors.line),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Column(
                                   children: [
-                                    Icon(c['icon'] as IconData, size: 16, color: selected ? Colors.white : AppColors.ink2),
+                                    Icon(c['icon'] as IconData,
+                                        size: 16,
+                                        color: selected
+                                            ? Colors.white
+                                            : AppColors.ink2),
                                     const SizedBox(height: 3),
                                     Text(c['label'] as String,
                                         style: AppTextStyles.tajawal(
-                                            size: 11, color: selected ? Colors.white : AppColors.ink2)),
+                                            size: 11,
+                                            color: selected
+                                                ? Colors.white
+                                                : AppColors.ink2)),
                                   ],
                                 ),
                               ),
@@ -223,10 +264,14 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: _booking ? null : () => _bookConsultation(l),
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.crimson),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.crimson),
                       icon: _booking
                           ? const SizedBox(
-                              height: 16, width: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2))
                           : const Icon(Icons.edit_outlined, size: 16),
                       label: const Text('احجز استشارة'),
                     ),
@@ -244,9 +289,12 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
     return Expanded(
       child: Column(
         children: [
-          Text(value, style: AppTextStyles.cairo(size: 15, weight: FontWeight.w800, color: AppColors.navy)),
+          Text(value,
+              style: AppTextStyles.cairo(
+                  size: 15, weight: FontWeight.w800, color: AppColors.navy)),
           const SizedBox(height: 2),
-          Text(label, style: AppTextStyles.tajawal(size: 9.5, color: AppColors.ink3)),
+          Text(label,
+              style: AppTextStyles.tajawal(size: 9.5, color: AppColors.ink3)),
         ],
       ),
     );
@@ -257,7 +305,8 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
       children: [
         Icon(icon, size: 19, color: AppColors.navyLight),
         const SizedBox(height: 4),
-        Text(label, style: AppTextStyles.tajawal(size: 10, color: AppColors.ink2)),
+        Text(label,
+            style: AppTextStyles.tajawal(size: 10, color: AppColors.ink2)),
       ],
     );
   }

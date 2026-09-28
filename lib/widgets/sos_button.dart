@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
+import '../services/auth_gate.dart';
 import '../theme/app_theme.dart';
 
 class SosButton extends StatelessWidget {
   const SosButton({super.key});
 
   Future<void> _confirmAndTrigger(BuildContext context) async {
+    // Emergency assistance is account-bound, so a guest is asked to sign in
+    // first rather than being sent an anonymous request.
+    if (!context.read<AppState>().isLoggedIn) {
+      await promptSignIn(context, feature: 'النجدة القانونية العاجلة');
+      return;
+    }
+    if (!context.mounted) return;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -16,7 +25,9 @@ class SosButton extends StatelessWidget {
           style: AppTextStyles.tajawal(size: 13),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.crimson),
             onPressed: () => Navigator.pop(ctx, true),
@@ -33,13 +44,15 @@ class SosButton extends StatelessWidget {
       await appState.sos.trigger(note: 'تفعيل من زر SOS بواجهة العميل');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم إرسال طلب النجدة، سيتم التواصل معك فورًا.')),
+          const SnackBar(
+              content: Text('تم إرسال طلب النجدة، سيتم التواصل معك فورًا.')),
         );
       }
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذّر إرسال طلب النجدة، حاول مرة أخرى.')),
+          const SnackBar(
+              content: Text('تعذّر إرسال طلب النجدة، حاول مرة أخرى.')),
         );
       }
     }
@@ -52,13 +65,16 @@ class SosButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(color: AppColors.crimson, borderRadius: BorderRadius.circular(20)),
+        decoration: BoxDecoration(
+            color: AppColors.crimson, borderRadius: BorderRadius.circular(20)),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.shield_outlined, size: 14, color: Colors.white),
             const SizedBox(width: 5),
-            Text('SOS', style: AppTextStyles.cairo(size: 11, weight: FontWeight.w700, color: Colors.white)),
+            Text('SOS',
+                style: AppTextStyles.cairo(
+                    size: 11, weight: FontWeight.w700, color: Colors.white)),
           ],
         ),
       ),
