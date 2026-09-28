@@ -17,57 +17,42 @@ class Conversation {
     this.lastMessagePreview,
     this.messagesCount = 0,
   });
-
-  factory Conversation.fromJson(Map<String, dynamic> json) => Conversation(
-        id: int.parse(json['id'].toString()),
-        type: json['conversation_type'] ?? 'client_lawyer',
-        subject: json['subject'],
-        caseId: json['case_id'] == null ? null : int.parse(json['case_id'].toString()),
-        lastMessagePreview: json['last_message_preview'],
-        messagesCount: int.tryParse('${json['messages_count']}') ?? 0,
-      );
 }
 
 class Message {
   final int id;
   final String body;
-  final int senderUserId;
   final String senderName;
   final String createdAt;
 
   Message({
     required this.id,
     required this.body,
-    required this.senderUserId,
     required this.senderName,
     required this.createdAt,
   });
-
-  factory Message.fromJson(Map<String, dynamic> json) => Message(
-        id: int.parse(json['id'].toString()),
-        body: json['body'] ?? '',
-        senderUserId: int.parse(json['sender_user_id'].toString()),
-        senderName: json['sender_name'] ?? '',
-        createdAt: json['created_at'] ?? '',
-      );
 }
 
+/// Client messaging is not exposed by the platform API.
+///
+/// The production communications routes (`/api/mobile/communications/*`) are
+/// scoped to a lawyer session or to a per-request capability token issued during
+/// an emergency (SOS) flow. There is no endpoint that lists a client's
+/// conversations by account, so these methods report the gap instead of calling
+/// a route that does not exist and rendering an empty list.
 class MessagesService {
   final ApiClient api;
   MessagesService(this.api);
 
-  Future<List<Conversation>> conversations() async {
-    final data = await api.get('/api/v1/conversations');
-    return (data['conversations'] as List).map((e) => Conversation.fromJson(e)).toList();
-  }
+  static const unavailable = ApiException(
+    'feature_not_available',
+    501,
+    message: 'المحادثات غير متاحة في تطبيق العميل حاليًا',
+  );
 
-  Future<List<Message>> messages(int conversationId) async {
-    final data = await api.get('/api/v1/conversations/$conversationId/messages');
-    return (data['messages'] as List).map((e) => Message.fromJson(e)).toList();
-  }
+  Future<List<Conversation>> conversations() async => throw unavailable;
 
-  Future<int> send(int conversationId, String body) async {
-    final data = await api.post('/api/v1/conversations/$conversationId/messages', {'body': body});
-    return int.parse('${data['id']}');
-  }
+  Future<List<Message>> messages(int conversationId) async => throw unavailable;
+
+  Future<int> send(int conversationId, String body) async => throw unavailable;
 }

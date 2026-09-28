@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/category.dart';
 import '../models/lawyer.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
@@ -9,6 +8,10 @@ import '../widgets/lawyer_row.dart';
 import '../widgets/section_title.dart';
 import 'lawyer_profile_screen.dart';
 
+/// The public directory of approved lawyers, backed by `GET /api/mobile/lawyers`.
+///
+/// Search is client-side over the directory response: the endpoint returns the
+/// full country list in one call and has no server-side query parameter.
 class LawyersDirectoryScreen extends StatefulWidget {
   const LawyersDirectoryScreen({super.key});
 
@@ -17,8 +20,6 @@ class LawyersDirectoryScreen extends StatefulWidget {
 }
 
 class _LawyersDirectoryScreenState extends State<LawyersDirectoryScreen> {
-  List<LegalCategory> _categories = [];
-  int? _selectedCategoryId;
   String _query = '';
   Timer? _debounce;
   late Future<List<Lawyer>> _future;
@@ -26,32 +27,20 @@ class _LawyersDirectoryScreenState extends State<LawyersDirectoryScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCategories();
-    _future = context.read<AppState>().lawyers.search();
-  }
-
-  void _loadCategories() {
-    context.read<AppState>().lawyers.categories().then((c) {
-      if (mounted) setState(() => _categories = c);
-    }).catchError((_) {
-      // A failed category list must not break the directory; the search below
-      // still works without the filter chips.
-      if (mounted) setState(() => _categories = []);
-    });
+    _reload();
   }
 
   void _reload() {
     final appState = context.read<AppState>();
     setState(() {
-      _future = appState.lawyers.search(categoryId: _selectedCategoryId, query: _query);
+      _future = appState.lawyers.directory();
     });
   }
 
   void _onQueryChanged(String value) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 350), () {
-      _query = value;
-      _reload();
+    _debounce = Timer(const Duration(milliseconds: 250), () {
+      if (mounted) setState(() => _query = value.trim());
     });
   }
 
@@ -59,6 +48,16 @@ class _LawyersDirectoryScreenState extends State<LawyersDirectoryScreen> {
   void dispose() {
     _debounce?.cancel();
     super.dispose();
+  }
+
+  List<Lawyer> _filter(List<Lawyer> all) {
+    if (_query.isEmpty) return all;
+    final q = _query.toLowerCase();
+    return all
+        .where((l) =>
+            l.name.toLowerCase().contains(q) ||
+            (l.nameEn ?? '').toLowerCase().contains(q))
+        .toList();
   }
 
   @override
@@ -73,33 +72,8 @@ class _LawyersDirectoryScreenState extends State<LawyersDirectoryScreen> {
             TextField(
               onChanged: _onQueryChanged,
               decoration: const InputDecoration(
-                hintText: 'ابحث بالاسم أو التخصص أو المدينة...',
+                hintText: 'ابحث بالاسم...',
                 prefixIcon: Icon(Icons.search, size: 20),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 36,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  _CategoryChip(
-                    label: 'الكل',
-                    selected: _selectedCategoryId == null,
-                    onTap: () {
-                      setState(() => _selectedCategoryId = null);
-                      _reload();
-                    },
-                  ),
-                  ..._categories.map((c) => _CategoryChip(
-                        label: c.nameAr,
-                        selected: _selectedCategoryId == c.id,
-                        onTap: () {
-                          setState(() => _selectedCategoryId = c.id);
-                          _reload();
-                        },
-                      )),
-                ],
               ),
             ),
             const SizedBox(height: 14),
@@ -124,17 +98,17 @@ class _LawyersDirectoryScreenState extends State<LawyersDirectoryScreen> {
                                 style: AppTextStyles.tajawal(color: AppColors.ink2)),
                             const SizedBox(height: 12),
                             ElevatedButton(
-                                onPressed: _reload,
-                                child: const Text('إعادة المحاولة')),
+                                onPressed: _reload, child: const Text('إعادة المحاولة')),
                           ],
                         ),
                       ),
                     );
                   }
-                  final list = snap.data!;
+                  final list = _filter(snap.data ?? const <Lawyer>[]);
                   if (list.isEmpty) {
                     return Center(
-                      child: Text('لا يوجد محامون مطابقون', style: AppTextStyles.tajawal(color: AppColors.ink2)),
+                      child: Text('لا يوجد محامون مطابقون',
+                          style: AppTextStyles.tajawal(color: AppColors.ink2)),
                     );
                   }
                   return ListView.builder(
@@ -142,7 +116,7 @@ class _LawyersDirectoryScreenState extends State<LawyersDirectoryScreen> {
                     itemBuilder: (context, i) => LawyerRow(
                       lawyer: list[i],
                       onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => LawyerProfileScreen(lawyerId: list[i].id)),
+                        MaterialPageRoute(builder: (_) => LawyerProfileScreen(lawyer: list[i])),
                       ),
                     ),
                   );
@@ -150,41 +124,6 @@ class _LawyersDirectoryScreenState extends State<LawyersDirectoryScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CategoryChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _CategoryChip({required this.label, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.navy : Colors.white,
-            border: Border.all(color: selected ? AppColors.navy : AppColors.line),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: AppTextStyles.tajawal(
-              size: 12,
-              weight: selected ? FontWeight.w700 : FontWeight.w400,
-              color: selected ? Colors.white : AppColors.ink2,
-            ),
-          ),
         ),
       ),
     );

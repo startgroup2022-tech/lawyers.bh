@@ -83,7 +83,7 @@ class AppState extends ChangeNotifier {
     if (token != null && token.isNotEmpty) {
       api.setToken(token);
       try {
-        currentUser = await (identityLoader ?? auth.me)();
+        currentUser = await (identityLoader ?? auth.session)();
         isGuest = false;
         await prefs.remove(_guestPrefsKey);
         result = BootstrapResult.authenticated;
@@ -126,15 +126,9 @@ class AppState extends ChangeNotifier {
     isGuest = false;
     sessionExpired = false;
 
-    // The OTP response carries the primary role only. Fetch the full identity
-    // so `roles`/`permissions` are populated before the shell decides which
-    // workspace to open.
+    // The verify response already carries the full client profile, so no
+    // follow-up identity call is needed; keep it simple and use it directly.
     currentUser = user;
-    try {
-      currentUser = await auth.me();
-    } catch (_) {
-      // Keep the OTP-provided user; role-based routing still works off `role`.
-    }
     notifyListeners();
   }
 
@@ -146,18 +140,27 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_guestPrefsKey, true);
     isGuest = true;
+    sessionExpired = false;
     currentUser = null;
     api.setToken(null);
     notifyListeners();
   }
 
   Future<void> logout() async {
+    // Best-effort server-side session teardown before clearing locally. A
+    // failed call must not leave the user stuck signed in.
+    try {
+      await auth.logout();
+    } catch (_) {
+      // Ignore: clearing local state below is what matters.
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenPrefsKey);
     await prefs.remove(_guestPrefsKey);
     api.setToken(null);
     currentUser = null;
     isGuest = false;
+    sessionExpired = false;
     notifyListeners();
   }
 

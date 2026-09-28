@@ -1,6 +1,6 @@
 import 'api_client.dart';
 
-/// A payment intent as the backend models it.
+/// A payment intent as the platform models it.
 class Payment {
   final int id;
   final String? paymentNumber;
@@ -20,16 +20,6 @@ class Payment {
     this.gatewayReference,
   });
 
-  factory Payment.fromJson(Map<String, dynamic> json) => Payment(
-        id: int.parse((json['payment_id'] ?? json['id']).toString()),
-        paymentNumber: json['payment_number']?.toString(),
-        status: json['status'] ?? 'pending',
-        amount: double.tryParse('${json['amount']}') ?? 0,
-        currency: json['currency'] ?? 'BHD',
-        method: json['method'] ?? 'benefitpay',
-        gatewayReference: json['gateway_reference']?.toString(),
-      );
-
   bool get isPaid => status == 'paid';
 }
 
@@ -48,65 +38,38 @@ class PaymentInitiation {
     required this.provider,
     required this.method,
   });
-
-  factory PaymentInitiation.fromJson(Map<String, dynamic> json) => PaymentInitiation(
-        paymentId: int.parse((json['payment_id'] ?? json['id']).toString()),
-        amount: double.tryParse('${json['amount']}') ?? 0,
-        currency: json['currency'] ?? 'BHD',
-        provider: json['provider'] ?? '',
-        method: json['method'] ?? '',
-      );
 }
 
-/// Talks to the canonical payment API.
+/// Payments are attached to a booking or an emergency request, neither of which
+/// the client app can create yet.
 ///
-/// The gateway itself is never driven from here: the app opens the gateway's
-/// own SDK, then hands the resulting reference back to the server, which asks
-/// the gateway what actually happened. The app cannot mark a payment as paid.
+/// The mobile API exposes Tap gateway sessions (`/api/mobile/tap/*`) that are
+/// opened from a website-created request, plus discount quotes
+/// (`/api/mobile/discounts/quote`). There is no client-facing
+/// "pay for my contract" endpoint because there is no client-facing contract.
+/// These methods report the gap instead of posting to a route that does not
+/// exist.
 class PaymentsService {
   final ApiClient api;
   PaymentsService(this.api);
 
-  /// Creates a payment intent for a signed contract.
+  static ApiException _unavailable() => ApiException.featureUnavailable(
+        'الدفع غير متاح في التطبيق حاليًا',
+      );
+
   Future<Payment> create({
     required int contractId,
     required String method,
     String? idempotencyKey,
-  }) async {
-    final data = await api.post('/api/v1/payments', {
-      'contract_id': contractId,
-      'method': method,
-      if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
-    });
-    return Payment.fromJson(data);
-  }
+  }) async =>
+      throw _unavailable();
 
-  /// Marks the intent as sent to the gateway and returns the SDK parameters.
-  Future<PaymentInitiation> initiate(int paymentId) async {
-    final data = await api.post('/api/v1/payments/$paymentId/initiate');
-    return PaymentInitiation.fromJson(data);
-  }
+  Future<PaymentInitiation> initiate(int paymentId) async => throw _unavailable();
 
-  /// Submits the gateway reference for server-side verification.
-  ///
-  /// Throws [ApiException] with code `gateway_not_configured` when the backend
-  /// has no gateway credentials. That is a configuration problem, not a
-  /// payment failure, and the caller should surface it as such.
-  Future<Payment> confirm(int paymentId, {required String gatewayReference}) async {
-    final data = await api.post(
-      '/api/v1/payments/$paymentId/confirm',
-      {'gateway_reference': gatewayReference},
-    );
-    return Payment.fromJson(data);
-  }
+  Future<Payment> confirm(int paymentId, {required String gatewayReference}) async =>
+      throw _unavailable();
 
-  Future<Payment> show(int paymentId) async {
-    final data = await api.get('/api/v1/payments/$paymentId');
-    return Payment.fromJson(data['payment'] ?? data);
-  }
+  Future<Payment> show(int paymentId) async => throw _unavailable();
 
-  Future<List<Payment>> myPayments() async {
-    final data = await api.get('/api/v1/payments');
-    return (data['payments'] as List).map((e) => Payment.fromJson(e)).toList();
-  }
+  Future<List<Payment>> myPayments() async => throw _unavailable();
 }

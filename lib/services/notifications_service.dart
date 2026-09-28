@@ -1,5 +1,6 @@
 import 'api_client.dart';
 
+/// A notification as the lawyer inbox models it.
 class AppNotification {
   final int id;
   final String title;
@@ -20,38 +21,27 @@ class AppNotification {
     this.actionUrl,
     required this.createdAt,
   });
-
-  factory AppNotification.fromJson(Map<String, dynamic> json) => AppNotification(
-        id: int.parse(json['id'].toString()),
-        title: json['title'] ?? '',
-        body: json['body'],
-        category: json['category'] ?? 'system',
-        priority: json['priority'] ?? 'normal',
-        isRead: json['is_read'] == true || json['is_read'] == 1,
-        actionUrl: json['action_url'],
-        createdAt: json['created_at'] ?? '',
-      );
 }
 
+/// The notification inbox is scoped to a lawyer session.
+///
+/// `/api/mobile/notifications` and `/api/mobile/lawyer/notifications` both
+/// require a mobile **lawyer** session token (or an SOS dispatch token); there
+/// is no notification feed for a client account. Client notification
+/// preferences are settable (`/api/mobile/notification-preferences`), but the
+/// feed itself is not exposed, so listing is reported as unavailable.
 class NotificationsService {
   final ApiClient api;
   NotificationsService(this.api);
 
-  /// Returns the caller's notifications plus the unread count.
-  Future<(List<AppNotification> items, int unread)> list({bool unreadOnly = false}) async {
-    final data = await api.get('/api/v1/notifications', query: {
-      if (unreadOnly) 'unread_only': true,
-    });
-    final items = (data['notifications'] as List)
-        .map((e) => AppNotification.fromJson(e))
-        .toList();
-    return (items, int.tryParse('${data['unread_count']}') ?? 0);
-  }
+  static ApiException _unavailable() => ApiException.featureUnavailable(
+        'الإشعارات غير متاحة في تطبيق العميل حاليًا',
+      );
 
-  Future<void> markRead(int id) => api.post('/api/v1/notifications/$id/read');
+  Future<(List<AppNotification> items, int unread)> list({bool unreadOnly = false}) async =>
+      throw _unavailable();
 
-  Future<int> markAllRead() async {
-    final data = await api.post('/api/v1/notifications/read-all');
-    return int.tryParse('${data['marked_read']}') ?? 0;
-  }
+  Future<void> markRead(int id) async => throw _unavailable();
+
+  Future<int> markAllRead() async => throw _unavailable();
 }

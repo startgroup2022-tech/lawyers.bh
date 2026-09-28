@@ -8,11 +8,20 @@ class LawyerRow extends StatelessWidget {
   final VoidCallback onTap;
   const LawyerRow({super.key, required this.lawyer, required this.onTap});
 
-  BadgeTone get _availabilityTone {
-    final label = lawyer.availabilityLabel ?? '';
-    if (label.contains('اليوم')) return BadgeTone.green;
-    if (label.contains('مجانية')) return BadgeTone.green;
-    return BadgeTone.neutral;
+  /// A human label for the lawyer's subscription tier.
+  String get _subscriptionLabel {
+    switch (lawyer.subscriptionType) {
+      case 'consultant':
+        return 'استشاري';
+      case 'mediator':
+        return 'وسيط';
+      case 'arbitrator':
+        return 'محكّم';
+      case 'expert':
+        return 'خبير';
+      default:
+        return 'محامٍ';
+    }
   }
 
   @override
@@ -45,23 +54,16 @@ class LawyerRow extends StatelessWidget {
                 children: [
                   Text(lawyer.name, style: AppTextStyles.cairo(size: 13, weight: FontWeight.w700)),
                   const SizedBox(height: 2),
-                  Text('${lawyer.categoryName} · ${lawyer.location}',
+                  Text(_subscriptionLabel,
                       style: AppTextStyles.tajawal(size: 11, color: AppColors.ink2)),
-                  if (lawyer.availabilityLabel != null) ...[
+                  if (lawyer.isEmergencyReady) ...[
                     const SizedBox(height: 6),
-                    StatusBadge(label: lawyer.availabilityLabel!, tone: _availabilityTone),
+                    const StatusBadge(label: 'نجدة عاجلة', tone: BadgeTone.green),
                   ],
                 ],
               ),
             ),
-            Column(
-              children: [
-                const Icon(Icons.chevron_left, color: AppColors.ink3, size: 20),
-                const SizedBox(height: 4),
-                Text('★ ${lawyer.rating}',
-                    style: AppTextStyles.cairo(size: 12, weight: FontWeight.w700, color: AppColors.navy)),
-              ],
-            ),
+            const Icon(Icons.chevron_left, color: AppColors.ink3, size: 20),
           ],
         ),
       ),

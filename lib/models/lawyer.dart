@@ -1,55 +1,47 @@
+/// A lawyer as returned by `GET /api/mobile/lawyers`.
+///
+/// The directory exposes the public identity fields only: name, phone, email,
+/// status and subscription type. Rating, fee, bio and location are not part of
+/// this endpoint, so they are absent here rather than invented.
 class Lawyer {
-  final int id;
+  final String id;
   final String name;
-  final int categoryId;
-  final String categoryName;
-  final String location;
-  final String? bio;
-  final int experienceYears;
-  final double consultationFee;
-  final double rating;
-  final int reviewsCount;
-  final String? availabilityLabel;
-  final List<String> tags;
-  final bool isBookmarked;
+  final String? nameEn;
+  final String? phone;
+  final String? email;
+  final String status;
+  final String? subscriptionType;
+  final String countryCode;
 
   Lawyer({
     required this.id,
     required this.name,
-    required this.categoryId,
-    required this.categoryName,
-    required this.location,
-    this.bio,
-    required this.experienceYears,
-    required this.consultationFee,
-    required this.rating,
-    required this.reviewsCount,
-    this.availabilityLabel,
-    this.tags = const [],
-    this.isBookmarked = false,
+    this.nameEn,
+    this.phone,
+    this.email,
+    this.status = 'approved',
+    this.subscriptionType,
+    this.countryCode = 'BH',
   });
 
   String get initials {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    final letters = parts.take(2).map((p) => p.isNotEmpty ? p[0] : '').join();
-    return letters;
+    final source = name.trim().isNotEmpty ? name.trim() : (nameEn ?? '');
+    final parts = source.split(RegExp(r'\s+'));
+    return parts.take(2).map((p) => p.isNotEmpty ? p[0] : '').join();
   }
 
+  /// Whether the lawyer's subscription covers emergency (SOS) work.
+  bool get isEmergencyReady =>
+      subscriptionType == 'emergency' || subscriptionType == 'sos';
+
   factory Lawyer.fromJson(Map<String, dynamic> json) => Lawyer(
-        id: int.parse(json['id'].toString()),
-        name: json['name'] ?? '',
-        // A lawyer may have no specialization yet, in which case the backend
-        // sends null; treat that as "uncategorised" rather than crashing.
-        categoryId: int.tryParse('${json['category_id']}') ?? 0,
-        categoryName: json['category_name'] ?? '',
-        location: json['location'] ?? '',
-        bio: json['bio'],
-        experienceYears: int.tryParse('${json['experience_years']}') ?? 0,
-        consultationFee: double.tryParse('${json['consultation_fee']}') ?? 0,
-        rating: double.tryParse('${json['rating']}') ?? 5.0,
-        reviewsCount: int.tryParse('${json['reviews_count']}') ?? 0,
-        availabilityLabel: json['availability_label'],
-        tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? const [],
-        isBookmarked: json['is_bookmarked'] == true || json['is_bookmarked'] == 1,
+        id: json['id']?.toString() ?? '',
+        name: (json['fullNameAr'] ?? json['name'] ?? json['fullNameEn'] ?? '').toString(),
+        nameEn: (json['fullNameEn'] ?? json['name_en'])?.toString(),
+        phone: json['phone']?.toString(),
+        email: json['email']?.toString(),
+        status: json['status']?.toString() ?? 'approved',
+        subscriptionType: json['subscriptionType']?.toString(),
+        countryCode: json['countryCode']?.toString() ?? 'BH',
       );
 }

@@ -3,25 +3,24 @@ import 'package:lawyers_bh_client/models/lead.dart';
 import 'package:lawyers_bh_client/models/legal_case.dart';
 import 'package:lawyers_bh_client/models/lawyer_profile.dart';
 import 'package:lawyers_bh_client/models/user.dart';
-import 'package:lawyers_bh_client/services/messages_service.dart';
 import 'package:lawyers_bh_client/widgets/pro_badge.dart';
 
 void main() {
   group('role-based routing', () {
     test('a lawyer lands in the professional workspace', () {
-      final user = AppUser(id: 1, phone: '+97339000001', role: 'lawyer');
+      final user = AppUser(id: '1', phone: '+97339000001', role: 'lawyer');
       expect(user.isProfessional, isTrue);
     });
 
     test('a client lands in the consumer workspace', () {
-      final user = AppUser(id: 2, phone: '+97339000002', role: 'client');
+      final user = AppUser(id: '2', phone: '+97339000002', role: 'client');
       expect(user.isProfessional, isFalse);
     });
 
     test('a firm manager is professional even though the primary role differs', () {
       // `/auth/me` can grant extra roles; `role` stays the primary one.
       final user = AppUser(
-        id: 3,
+        id: '3',
         phone: '+97339000003',
         role: 'client',
         roles: ['client', 'law_firm_manager'],
@@ -31,7 +30,7 @@ void main() {
 
     test('permissions are read from the identity payload', () {
       final user = AppUser(
-        id: 1,
+        id: '1',
         phone: '+97339000001',
         role: 'lawyer',
         permissions: ['leads.view', 'cases.view'],
@@ -40,23 +39,32 @@ void main() {
       expect(user.can('payments.refund'), isFalse);
     });
 
-    test('parses the identity shape returned by GET /auth/me', () {
-      final user = AppUser.fromJson({
-        'id': 1,
-        'uuid': 'e1be62c1-cfeb-4cef-ac40-e3b5fa9a6fe2',
+    test('parses the mobile client shape and the richer professional shape', () {
+      // The mobile client identity (client-auth): id/email/fullName/phone.
+      final client = AppUser.fromJson({
+        'id': 'e1be62c1-cfeb-4cef-ac40-e3b5fa9a6fe2',
+        'email': 'ahmed@example.com',
+        'fullName': 'Ahmed Al Mansoori',
         'phone': '+97339000001',
-        'name': 'Ahmed Al Mansoori',
+      });
+      expect(client.id, 'e1be62c1-cfeb-4cef-ac40-e3b5fa9a6fe2');
+      expect(client.email, 'ahmed@example.com');
+      expect(client.displayName, 'Ahmed Al Mansoori');
+      expect(client.isProfessional, isFalse);
+
+      // A professional identity may still carry roles/permissions.
+      final lawyer = AppUser.fromJson({
+        'id': '2',
+        'phone': '+97339000002',
+        'name': 'Sara',
         'role': 'lawyer',
         'roles': ['lawyer'],
         'permissions': ['leads.view'],
         'is_verified': true,
-        'preferred_language': 'ar',
-        'avatar_path': null,
       });
-      expect(user.id, 1);
-      expect(user.isProfessional, isTrue);
-      expect(user.isVerified, isTrue);
-      expect(user.initials, 'AA');
+      expect(lawyer.isProfessional, isTrue);
+      expect(lawyer.can('leads.view'), isTrue);
+      expect(lawyer.isVerified, isTrue);
     });
   });
 
@@ -205,46 +213,6 @@ void main() {
     });
   });
 
-  group('messages parsing', () {
-    test('parses the conversation shape returned by GET /conversations', () {
-      final conversation = Conversation.fromJson({
-        'id': 7,
-        'conversation_type': 'case',
-        'subject': 'قضية تجارية',
-        'case_id': 12,
-        'last_message_preview': 'شكرًا',
-        'messages_count': '3',
-      });
-      expect(conversation.id, 7);
-      expect(conversation.type, 'case');
-      expect(conversation.caseId, 12);
-      expect(conversation.messagesCount, 3);
-    });
-
-    test('a conversation without a case reads as null case_id', () {
-      final conversation = Conversation.fromJson({
-        'id': 8,
-        'conversation_type': 'client_lawyer',
-        'case_id': null,
-      });
-      expect(conversation.caseId, isNull);
-      expect(conversation.type, 'client_lawyer');
-    });
-
-    test('parses the message shape returned by GET /conversations/{id}/messages', () {
-      final message = Message.fromJson({
-        'id': 21,
-        'body': 'تم رفع المستند',
-        'sender_user_id': 4,
-        'sender_name': 'أحمد المنصوري',
-        'created_at': '2026-09-28 10:00:00',
-      });
-      expect(message.id, 21);
-      expect(message.body, 'تم رفع المستند');
-      expect(message.senderUserId, 4);
-      expect(message.senderName, 'أحمد المنصوري');
-    });
-  });
 
   group('status mappings', () {
 

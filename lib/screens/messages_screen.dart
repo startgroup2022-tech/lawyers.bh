@@ -241,7 +241,6 @@ class _MessageThreadScreenState extends State<MessageThreadScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final me = context.read<AppState>().currentUser;
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.conversation.subject?.isNotEmpty == true
@@ -251,7 +250,7 @@ class _MessageThreadScreenState extends State<MessageThreadScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Expanded(child: _body(me?.id)),
+            Expanded(child: _body()),
             _composerBar(),
           ],
         ),
@@ -259,7 +258,7 @@ class _MessageThreadScreenState extends State<MessageThreadScreen> {
     );
   }
 
-  Widget _body(int? myUserId) {
+  Widget _body() {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) return _ErrorState(message: _error!, onRetry: _load);
     if (_messages.isEmpty) {
@@ -274,29 +273,26 @@ class _MessageThreadScreenState extends State<MessageThreadScreen> {
       itemCount: _messages.length,
       itemBuilder: (context, i) {
         final m = _messages[i];
-        final mine = myUserId != null && m.senderUserId == myUserId;
+        // Messages are already scoped to the caller by the backend.
         return Align(
-          alignment: mine ? Alignment.centerLeft : Alignment.centerRight,
+          alignment: Alignment.centerRight,
           child: Container(
             constraints: const BoxConstraints(maxWidth: 300),
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: mine ? AppColors.brandRed : AppColors.surface,
-              border: mine ? null : Border.all(color: AppColors.line),
+              color: AppColors.surface,
+              border: Border.all(color: AppColors.line),
               borderRadius: BorderRadius.circular(AppRadii.md),
             ),
             child: Column(
-              crossAxisAlignment:
-                  mine ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                if (!mine)
-                  Text(m.senderName,
-                      style: AppTextStyles.cairo(
-                          size: 11, weight: FontWeight.w700, color: AppColors.ink2)),
+                Text(m.senderName,
+                    style: AppTextStyles.cairo(
+                        size: 11, weight: FontWeight.w700, color: AppColors.ink2)),
                 Text(m.body,
-                    style: AppTextStyles.tajawal(
-                        size: 12.5, color: mine ? Colors.white : AppColors.ink)),
+                    style: AppTextStyles.tajawal(size: 12.5, color: AppColors.ink)),
               ],
             ),
           ),

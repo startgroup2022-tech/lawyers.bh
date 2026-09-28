@@ -1,5 +1,10 @@
-/// Roles the backend can grant. `users.role` is the primary one; a user may
-/// also hold extra roles through `user_roles`.
+/// The signed-in client, as returned by `/api/mobile/client-auth/*`.
+///
+/// The mobile client identity is its own record (`mobile_client_accounts`),
+/// addressed by a UUID and identified by email + phone. It is deliberately not
+/// the lawyer identity used by the professional portal: a lawyer signs in to
+/// the lawyer app with their own credentials, and the same email can exist as
+/// both a client and a lawyer without the two being the same account.
 class AppRoles {
   static const client = 'client';
   static const lawyer = 'lawyer';
@@ -14,12 +19,13 @@ class AppRoles {
 }
 
 class AppUser {
-  final int id;
+  final String id;
   final String phone;
   final String? name;
   final String role;
 
-  /// Every role the account holds, as returned by `GET /auth/me`.
+  /// Every role the account holds. Populated only by backends that expose
+  /// roles/permissions (the professional portals); empty for mobile clients.
   final List<String> roles;
 
   /// Granted permission slugs, e.g. `leads.view`.
@@ -34,7 +40,7 @@ class AppUser {
     required this.id,
     required this.phone,
     this.name,
-    required this.role,
+    this.role = AppRoles.client,
     this.roles = const [],
     this.permissions = const [],
     this.email,
@@ -44,7 +50,7 @@ class AppUser {
   });
 
   /// True when the account has any professional role. The primary `role` is
-  /// checked too because the OTP verify response carries that field alone.
+  /// checked too because a verify response may carry that field alone.
   bool get isProfessional {
     if (AppRoles.professional.contains(role)) return true;
     return roles.any(AppRoles.professional.contains);
@@ -54,24 +60,32 @@ class AppUser {
 
   bool can(String permission) => permissions.contains(permission);
 
-  String get displayName => (name == null || name!.trim().isEmpty) ? phone : name!;
+  String get displayName {
+    final n = name;
+    if (n != null && n.trim().isNotEmpty) return n;
+    return phone.isNotEmpty ? phone : (email ?? '');
+  }
 
   String get initials {
     final parts = displayName.trim().split(RegExp(r'\s+'));
     return parts.take(2).map((p) => p.isNotEmpty ? p[0] : '').join();
   }
 
+  /// Parses the mobile client shape (`{id, email, fullName, phone}`) and
+  /// tolerates the richer professional shape (`{id, name, role, roles, ...}`).
   factory AppUser.fromJson(Map<String, dynamic> json) => AppUser(
-        id: int.parse(json['id'].toString()),
-        phone: json['phone'],
-        name: json['name'],
-        role: json['role'] ?? 'client',
+        id: json['id']?.toString() ?? '',
+        phone: json['phone']?.toString() ?? '',
+        name: (json['fullName'] ?? json['name'])?.toString(),
+        role: json['role']?.toString() ?? AppRoles.client,
         roles: (json['roles'] as List?)?.map((e) => e.toString()).toList() ?? const [],
         permissions:
             (json['permissions'] as List?)?.map((e) => e.toString()).toList() ?? const [],
-        email: json['email'],
-        avatarPath: json['avatar_path'],
-        preferredLanguage: json['preferred_language'],
-        isVerified: json['is_verified'] == true || json['is_verified'] == 1,
+        email: json['email']?.toString(),
+        avatarPath: json['avatar_path']?.toString(),
+        preferredLanguage: json['preferred_language']?.toString(),
+        isVerified: json['is_verified'] == true ||
+            json['is_verified'] == 1 ||
+            json['emailVerifiedAt'] != null,
       );
 }

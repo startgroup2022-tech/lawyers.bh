@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, kIsWeb, kReleaseMode, TargetPlatform;
 import 'package:http/http.dart' as http;
 
 /// Thrown when the backend reports a failure.
@@ -15,6 +13,14 @@ class ApiException implements Exception {
   final String? message;
 
   const ApiException(this.error, this.statusCode, {this.message});
+
+  /// The caller asked for a capability the platform API does not expose.
+  ///
+  /// Used by the parts of the app that map to a booking/CRM model the mobile
+  /// API has no endpoints for, so they fail loudly instead of pretending to
+  /// have loaded nothing.
+  factory ApiException.featureUnavailable([String? message]) =>
+      ApiException('feature_not_available', 501, message: message);
 
   @override
   String toString() => 'ApiException($statusCode): ${message ?? error}';
@@ -31,16 +37,15 @@ class ApiClient {
 
   /// Backend base URL, without a trailing slash.
   ///
-  /// A release build must always carry a real host: the production API is
-  /// injected at build time (Codemagic sets `API_BASE_URL` for release
-  /// workflows). `kReleaseMode` without that define would otherwise silently
-  /// point at localhost and look "connected" while every call fails, so the
-  /// canonical host is used as the release fallback. Debug/profile builds keep
-  /// the localhost convenience for day-to-day development.
+  /// The mobile API is part of the main Lawyers.bh Next.js deployment — the
+  /// website, the admin/lawyer portals and this app all read and write the same
+  /// database through it. There is no separate API host: `api.lawyers.bh` does
+  /// not resolve, which is why release builds pointed at a dead socket and every
+  /// screen failed to load.
   ///
-  /// Override for a device/emulator build:
-  ///   flutter run --dart-define=API_BASE_URL=http://192.168.1.10:8080
-  static const String productionBaseUrl = 'https://api.lawyers.bh';
+  /// Override for a local or device build:
+  ///   flutter run --dart-define=API_BASE_URL=http://192.168.1.10:3000
+  static const String productionBaseUrl = 'https://www.lawyers.bh';
 
   static const String _configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
 
@@ -48,14 +53,7 @@ class ApiClient {
     if (_configuredBaseUrl.isNotEmpty) {
       return _configuredBaseUrl.replaceAll(RegExp(r'/+$'), '');
     }
-    if (kReleaseMode) {
-      return productionBaseUrl;
-    }
-    // Android emulators reach the host through 10.0.2.2, not localhost.
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080';
-    }
-    return 'http://localhost:8080';
+    return productionBaseUrl;
   }
 
   String? _token;
@@ -135,8 +133,13 @@ class ApiClient {
     }
   }
 
-  /// Unwraps the canonical `{success, data, message}` envelope, and also
-  /// tolerates the legacy `{ok, data}` one.
+  /// Unwraps the Lawyers.bh mobile envelope.
+  ///
+  /// Every `/api/mobile/*` route answers `{"ok": true, ...payload}` on success
+  /// and `{"ok": false, "error": "code"}` on failure. The payload keys sit at
+  /// the **top level** — there is no `data` wrapper — so the whole body is
+  /// returned and callers read their own keys. The `{success, data, message}`
+  /// envelope is still unwrapped if a route returns it.
   Map<String, dynamic> _decode(http.Response res) {
     Map<String, dynamic> json;
     try {
@@ -145,13 +148,10 @@ class ApiClient {
       throw ApiException('invalid_server_response', res.statusCode);
     }
 
-    // Canonical envelope: {"success": true, "data": {...}, "message": null}
-    // Legacy envelope:   {"ok": true, "data": {...}}
     final bool? success = json['success'] as bool?;
     final bool? ok = json['ok'] as bool?;
-    final succeeded = success ?? ok ?? false;
 
-    if (!succeeded) {
+    if (success == false || ok == false) {
       final message = json['message']?.toString();
       final error = json['error']?.toString() ?? _codeFrom(json) ?? message ?? 'unknown_error';
       if (res.statusCode == 401) {
@@ -162,10 +162,19 @@ class ApiClient {
       throw ApiException(error, res.statusCode, message: message);
     }
 
-    final data = json['data'];
-    if (data is Map<String, dynamic>) return data;
-    if (data is List) return {'items': data};
-    return <String, dynamic>{};
+    // Canonical `{success, data}` envelope.
+    if (success == true) {
+      final data = json['data'];
+      if (data is Map<String, dynamic>) return data;
+      if (data is List) return {'items': data};
+      return <String, dynamic>{};
+    }
+
+    // Mobile `{ok, ...payload}` envelope, or a bare object on a 2xx.
+    if (ok == true) return json;
+    if (res.statusCode >= 200 && res.statusCode < 300) return json;
+
+    throw ApiException(json['error']?.toString() ?? 'unknown_error', res.statusCode);
   }
 
   /// Pulls a code out of the canonical `errors` block, which the backend may

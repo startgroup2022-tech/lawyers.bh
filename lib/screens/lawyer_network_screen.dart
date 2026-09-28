@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/category.dart';
 import '../models/lawyer.dart';
 import '../providers/app_state.dart';
 import '../services/api_client.dart';
@@ -11,10 +10,11 @@ import '../widgets/pro_badge.dart';
 import '../widgets/pro_section_title.dart';
 import 'lawyer_profile_screen.dart';
 
-/// The professional network: browse peers by specialization.
+/// The professional network: browse peers from the public directory.
 ///
-/// Reuses the public lawyers directory, but presented in the professional
-/// palette and framed as colleague discovery rather than consumer matching.
+/// Reuses `GET /api/mobile/lawyers` in the professional palette. Filtering is
+/// client-side because the endpoint returns the whole country list and has no
+/// server-side category or query parameters.
 class LawyerNetworkScreen extends StatefulWidget {
   const LawyerNetworkScreen({super.key});
 
@@ -23,21 +23,15 @@ class LawyerNetworkScreen extends StatefulWidget {
 }
 
 class _LawyerNetworkScreenState extends State<LawyerNetworkScreen> {
-  List<LegalCategory> _categories = const [];
-  int? _categoryId;
   String _query = '';
   Timer? _debounce;
-  List<Lawyer> _lawyers = const [];
+  List<Lawyer> _all = const [];
   bool _loading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    final app = context.read<AppState>();
-    app.lawyers.categories().then((c) {
-      if (mounted) setState(() => _categories = c);
-    }).catchError((_) {});
     _load();
   }
 
@@ -53,11 +47,8 @@ class _LawyerNetworkScreenState extends State<LawyerNetworkScreen> {
       _error = null;
     });
     try {
-      final list = await context
-          .read<AppState>()
-          .lawyers
-          .search(categoryId: _categoryId, query: _query);
-      if (mounted) setState(() => _lawyers = list);
+      final list = await context.read<AppState>().lawyers.directory();
+      if (mounted) setState(() => _all = list);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message ?? 'تعذّر تحميل المحامين');
     } catch (_) {
@@ -69,10 +60,19 @@ class _LawyerNetworkScreenState extends State<LawyerNetworkScreen> {
 
   void _onQuery(String v) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 350), () {
-      _query = v;
-      _load();
+    _debounce = Timer(const Duration(milliseconds: 250), () {
+      if (mounted) setState(() => _query = v.trim());
     });
+  }
+
+  List<Lawyer> get _filtered {
+    if (_query.isEmpty) return _all;
+    final q = _query.toLowerCase();
+    return _all
+        .where((l) =>
+            l.name.toLowerCase().contains(q) ||
+            (l.nameEn ?? '').toLowerCase().contains(q))
+        .toList();
   }
 
   @override
@@ -90,31 +90,14 @@ class _LawyerNetworkScreenState extends State<LawyerNetworkScreen> {
                 children: [
                   const ProSectionTitle(
                     title: 'الشبكة المهنية',
-                    subtitle: 'زملاء المحاماة حسب التخصص',
+                    subtitle: 'زملاء المحاماة المسجّلون في المنصة',
                   ),
                   TextField(
                     onChanged: _onQuery,
                     style: AppTextStyles.tajawal(size: 13),
                     decoration: const InputDecoration(
-                      hintText: 'ابحث بالاسم أو التخصص أو المدينة…',
+                      hintText: 'ابحث بالاسم…',
                       prefixIcon: Icon(Icons.search, size: 20),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    height: 34,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        _chip('الكل', _categoryId == null, () {
-                          setState(() => _categoryId = null);
-                          _load();
-                        }),
-                        ..._categories.map((c) => _chip(c.nameAr, _categoryId == c.id, () {
-                              setState(() => _categoryId = c.id);
-                              _load();
-                            })),
-                      ],
                     ),
                   ),
                 ],
@@ -126,16 +109,6 @@ class _LawyerNetworkScreenState extends State<LawyerNetworkScreen> {
       ),
     );
   }
-
-  Widget _chip(String label, bool selected, VoidCallback onTap) => Padding(
-        padding: const EdgeInsets.only(left: 8),
-        child: ChoiceChip(
-          label: Text(label),
-          selected: selected,
-          selectedColor: LawyerColors.accentSoft,
-          onSelected: (_) => onTap(),
-        ),
-      );
 
   Widget _body() {
     if (_loading) return const Center(child: CircularProgressIndicator());
@@ -158,7 +131,8 @@ class _LawyerNetworkScreenState extends State<LawyerNetworkScreen> {
         ),
       );
     }
-    if (_lawyers.isEmpty) {
+    final list = _filtered;
+    if (list.isEmpty) {
       return Center(
         child: Text('لا يوجد محامون مطابقون',
             style: AppTextStyles.tajawal(size: 13, color: LawyerColors.ink2)),
@@ -168,12 +142,12 @@ class _LawyerNetworkScreenState extends State<LawyerNetworkScreen> {
       onRefresh: _load,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: _lawyers.length,
+        itemCount: list.length,
         itemBuilder: (context, i) {
-          final l = _lawyers[i];
+          final l = list[i];
           return InkWell(
             onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => LawyerProfileScreen(lawyerId: l.id)),
+              MaterialPageRoute(builder: (_) => LawyerProfileScreen(lawyer: l)),
             ),
             borderRadius: BorderRadius.circular(AppRadii.md),
             child: Container(
@@ -201,29 +175,22 @@ class _LawyerNetworkScreenState extends State<LawyerNetworkScreen> {
                         Text(l.name,
                             style: AppTextStyles.cairo(size: 13, weight: FontWeight.w700)),
                         const SizedBox(height: 2),
-                        Text('${l.categoryName} · ${l.location}',
+                        Text(l.nameEn ?? '',
                             style: AppTextStyles.tajawal(size: 11, color: LawyerColors.ink2)),
                         const SizedBox(height: 6),
                         Wrap(
                           spacing: 6,
                           children: [
-                            ProBadge(label: '${l.experienceYears} سنة', tone: LawyerColors.base2),
-                            if (l.tags.isNotEmpty)
-                              ProBadge(label: l.tags.first, tone: LawyerColors.accent),
+                            if (l.subscriptionType != null)
+                              ProBadge(label: l.subscriptionType!, tone: LawyerColors.base2),
+                            if (l.isEmergencyReady)
+                              const ProBadge(label: 'نجدة عاجلة', tone: LawyerColors.accent),
                           ],
                         ),
                       ],
                     ),
                   ),
-                  Column(
-                    children: [
-                      const Icon(Icons.chevron_left, color: LawyerColors.ink3, size: 19),
-                      const SizedBox(height: 4),
-                      Text('★ ${l.rating.toStringAsFixed(1)}',
-                          style: AppTextStyles.cairo(
-                              size: 11.5, weight: FontWeight.w700, color: LawyerColors.base)),
-                    ],
-                  ),
+                  const Icon(Icons.chevron_left, color: LawyerColors.ink3, size: 19),
                 ],
               ),
             ),

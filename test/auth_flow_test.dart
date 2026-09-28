@@ -45,7 +45,7 @@ void main() {
       SharedPreferences.setMockInitialValues({'auth_token': 'good-token'});
       final state = AppState();
       state.identityLoader = () async =>
-          AppUser(id: 1, phone: '+97339000001', role: 'client');
+          AppUser(id: '1', phone: '+97339000001', role: 'client');
       final result = await state.bootstrap();
       expect(result, BootstrapResult.authenticated);
       expect(state.isLoggedIn, isTrue);
@@ -103,9 +103,9 @@ void main() {
 
     test('a lawyer identity is still recognised as professional', () {
       final state = AppState();
-      state.currentUser = AppUser(id: 1, phone: '+97339000001', role: 'lawyer');
+      state.currentUser = AppUser(id: '1', phone: '+97339000001', role: 'lawyer');
       expect(state.isProfessional, isTrue);
-      state.currentUser = AppUser(id: 2, phone: '+97339000002', role: 'client');
+      state.currentUser = AppUser(id: '2', phone: '+97339000002', role: 'client');
       expect(state.isProfessional, isFalse);
     });
   });
@@ -151,7 +151,8 @@ void main() {
       await tester.pump();
 
       expect(find.text('الدخول كزائر'), findsOneWidget);
-      expect(find.text('إرسال رمز التحقق'), findsOneWidget);
+      expect(find.text('تسجيل الدخول'), findsWidgets);
+      expect(find.text('حساب جديد'), findsOneWidget);
     });
 
     testWidgets('shows the session-expired notice when handed one', (tester) async {
@@ -201,11 +202,13 @@ void main() {
       expect(offenders, isEmpty, reason: 'the app must only speak to the canonical API');
     });
 
-    test('every API path is under /api/v1', () {
+    test('every API path targets the real platform surface (/api/mobile)', () {
       final pattern = RegExp(r"""['"]/api/[^'"]*""");
       for (final file in dartFiles) {
         for (final match in pattern.allMatches(file.readAsStringSync())) {
-          expect(match.group(0), startsWith("'/api/v1"),
+          // The platform's client + lawyer API lives under /api/mobile. Anything
+          // else is either a web-portal route or a route that does not exist.
+          expect(match.group(0), startsWith("'/api/mobile"),
               reason: 'unexpected endpoint in ${file.path}: ${match.group(0)}');
         }
       }

@@ -5,48 +5,34 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:lawyers_bh_client/providers/app_state.dart';
+import 'package:lawyers_bh_client/services/api_client.dart';
 
-/// End-to-end check against a live backend.
+/// End-to-end check against the live platform.
 ///
 /// Skipped unless a base URL is provided, so the default `flutter test` run is
 /// fully offline:
 ///
-///   flutter test --dart-define=API_BASE_URL=http://localhost:8081 \
+///   flutter test --dart-define=API_BASE_URL=https://www.lawyers.bh \
 ///     test/backend_integration_test.dart
 ///
-/// It drives the real [AppState] and its services, so a green run means the
-/// canonical `/api/v1/auth/*` flow the app ships with actually works.
+/// It drives the real [AppState] and its services. The auth cases deliberately
+/// use *rejected* credentials, so the run never creates an account or sends an
+/// email; the point is to prove the app speaks the real contract and that a
+/// session which cannot be validated fails safely.
 void main() {
   const baseUrl = String.fromEnvironment('API_BASE_URL');
-  final skipReason = baseUrl.isEmpty ? 'set API_BASE_URL to run against a backend' : null;
+  final skipReason = baseUrl.isEmpty ? 'set API_BASE_URL to run against the backend' : null;
 
-  test('OTP login reaches /auth/me and restores the session', () async {
+  test('the public directory loads without a session (guest browsing)', () async {
     SharedPreferences.setMockInitialValues({});
     final state = AppState();
-    final phone = '+9733${(DateTime.now().microsecondsSinceEpoch % 10000000).toString().padLeft(7, '0')}';
+    expect(await state.bootstrap(), BootstrapResult.firstRun);
+    await state.continueAsGuest();
+    expect(state.isGuest, isTrue);
+    expect(state.isLoggedIn, isFalse);
 
-    // A single request; the backend returns the code outside production so the
-    // flow can be completed without SMS. (A second request would hit the
-    // resend cooldown.)
-    final code = await _requestCode(state, phone);
-    final (token, user) = await state.auth.verifyOtp(phone, code);
-
-    await state.completeLogin(token, user);
-    expect(state.isLoggedIn, isTrue);
-    expect(state.isGuest, isFalse);
-    expect(user.role, 'client');
-    expect(state.isProfessional, isFalse);
-  }, skip: skipReason);
-
-  test('a lawyer account routes to the professional workspace', () async {
-    SharedPreferences.setMockInitialValues({});
-    final state = AppState();
-    // Seeded demo lawyer account.
-    final code = await _requestCode(state, '+97339000002');
-    final (token, user) = await state.auth.verifyOtp('+97339000002', code);
-    await state.completeLogin(token, user);
-    expect(state.isLoggedIn, isTrue);
-    expect(state.isProfessional, isTrue);
+    final lawyers = await state.lawyers.directory();
+    expect(lawyers, isNotEmpty, reason: 'guest can browse the directory');
   }, skip: skipReason);
 
   test('bootstrap reports sessionExpired for a bogus token', () async {
@@ -55,25 +41,23 @@ void main() {
     expect(await state.bootstrap(), BootstrapResult.sessionExpired);
   }, skip: skipReason);
 
-  test('guest browsing never leaves isLoggedIn true', () async {
+  test('a valid-looking but rejected login surfaces the backend code', () async {
     SharedPreferences.setMockInitialValues({});
     final state = AppState();
-    await state.bootstrap();
-    await state.continueAsGuest();
-    expect(state.isGuest, isTrue);
+    await expectLater(
+      state.auth.login('definitely-not-registered@example.com', 'password123'),
+      throwsA(isA<ApiException>()),
+    );
     expect(state.isLoggedIn, isFalse);
-    // Public catalogues are reachable without a token.
-    final categories = await state.lawyers.categories();
-    expect(categories, isNotEmpty);
   }, skip: skipReason);
-}
 
-/// Requests a fresh OTP and reads the development `debug_code`.
-Future<String> _requestCode(AppState state, String phone) async {
-  final data = await state.api.post('/api/v1/auth/otp/request', {'phone': phone});
-  final code = data['debug_code']?.toString();
-  if (code == null || code.isEmpty) {
-    throw StateError('backend did not return a debug_code (is it running in production?)');
-  }
-  return code;
+  test('features without a client endpoint fail loudly, not silently', () async {
+    SharedPreferences.setMockInitialValues({});
+    final state = AppState();
+    await expectLater(
+      state.cases.myCases(),
+      throwsA(isA<ApiException>()
+          .having((e) => e.error, 'error', 'feature_not_available')),
+    );
+  }, skip: skipReason);
 }
