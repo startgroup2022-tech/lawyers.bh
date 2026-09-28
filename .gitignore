@@ -1,79 +1,44 @@
 # Flutter/Dart
 .dart_tool/
 .packages
+.pub-cache/
+.pub/
 build/
-*.dart_tool/package_config.json
-
-# IDE
-.idea/
-.vscode/
 *.iml
-*.swp
-*.swo
+*.ipr
+*.iws
+.idea/
+.metadata
+.flutter-plugins-dependencies
 
-# OS
-.DS_Store
-Thumbs.db
+# Generated platform folders: Codemagic runs `flutter create` before building,
+# so android/ and ios/ are intentionally not committed.
+/android/
+/ios/
 
-# Environment & Secrets
-.env
-.env.local
-.env.*.local
-*.keystore
-*.jks
-*.p12
-*.pem
-*.cert
-*.mobileprovision
-google-services.json
-GoogleService-Info.plist
-
-# Build outputs
-*.apk
-*.aab
-*.ipa
-*.dSYM
-build/
-ios/Flutter/App.framework
-ios/Flutter/Flutter.framework
-android/app/build/
-android/.gradle/
+# Android
+android/**/gradle-wrapper.jar
+android/.gradle
+android/captures/
+android/gradlew
+android/gradlew.bat
 android/local.properties
+android/**/GeneratedPluginRegistrant.java
+android/key.properties
+*.jks
+*.keystore
 
-# Generated files
-*.g.dart
-*.freezed.dart
-*.gr.dart
-*.config.dart
+# iOS
+ios/Flutter/.last_build_id
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/ServiceDefinitions.json
+**/*.xcuserstate
 
-# Coverage
-coverage/
-*.lcov
+# macOS
+.DS_Store
 
-# Logs
-*.log
-flutter_*.log
-
-# Test
-.test_coverage/
-
-# CI/CD
-codemagic.yaml.local
-
-# Misc
-*.orig
-*.bak
-*.tmp
-*.temp
-
-# Fastlane
-fastlane/report.xml
-fastlane/Preview.html
-fastlane/screenshots/
-fastlane/readme.md
-
-# Translation
-*.arb
-
-# Asset bundles
-.dart_tool/flutter_gen/
+# VS Code
+.vscode/

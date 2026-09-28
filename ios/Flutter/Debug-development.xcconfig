@@ -1,6 +1,0 @@
-// Development Configuration
-#include "Debug.xcconfig"
-
-PRODUCT_BUNDLE_IDENTIFIER = com.lawyersbh.app.dev
-PRODUCT_NAME = $(inherited) Dev
-ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon-Development

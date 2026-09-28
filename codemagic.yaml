@@ -1,47 +1,149 @@
-# Codemagic CI/CD for Lawyers.bh - Flutter Web build
-# Codemagic mac_mini_m2 has Flutter preinstalled, so no local SDK is needed.
+# Codemagic CI/CD for the Lawyers.bh mobile app.
+#
+# Three workflows:
+#   android-debug   — unsigned debug APK, safe to run before any keys exist.
+#   android-release — signed release APK + AAB (Play Store). Needs the
+#                     `lawyers_bh_keystore` signing identity in Codemagic.
+#   ios-release     — iOS IPA. Needs an Apple Developer account.
+#
+# Secrets: none are committed here. Signing material comes from Codemagic's
+# `android_signing`/`ios_signing` (injected as CM_KEYSTORE_* / profiles), and
+# the production API host comes from the encrypted `API_BASE_URL` group
+# variable. See flutter_app/README.md for the exact setup steps.
 
 workflows:
-  web:
-    name: Flutter Web Release
-    instance_type: mac_mini_m2
-    max_build_duration: 120
+  # ------------------------------------------------------------------
+  # 1) Quick debug APK — no signing keys and no secrets needed.
+  #    Points at the local dev host by default; override API_BASE_URL to
+  #    test a device build against a LAN address.
+  # ------------------------------------------------------------------
+  android-debug:
+    name: Android - Debug APK (no signing required)
+    max_build_duration: 30
+    instance_type: linux_x2
     environment:
       flutter: stable
-    cache:
-      cache_paths:
-        - .dart_tool
-        - .pub-cache
     scripts:
-      - name: Setup environment
+      - name: Generate android/ios platform folders if missing
         script: |
-          echo "Setting up development environment..."
-          cp .env.development .env
-      - name: Generate web platform files
+          if [ ! -d "android" ]; then
+            flutter create --platforms=android,ios --org com.superai.lawyersbh --project-name lawyers_bh_client .
+          fi
+      - name: Remove the flutter create template test
         script: |
-          flutter config --enable-web
-          flutter create --platforms=web --project-name lawyers_bh web
-      - name: Get dependencies
+          # `flutter create` writes a counter-app widget test that references a
+          # MyApp class this project does not have. Left in place it fails
+          # analysis and any test run.
+          rm -f test/widget_test.dart
+      - name: Get Flutter packages
+        script: flutter pub get
+      - name: Analyze
+        script: flutter analyze
+      - name: Run tests
+        script: flutter test
+      - name: Build debug APK
         script: |
-          flutter pub get
-      - name: Generate code (build_runner)
-        script: |
-          dart run build_runner build --delete-conflicting-outputs
-      - name: Build web release
-        script: |
-          flutter build web --release
-      - name: Package web output
-        script: |
-          cd build/web
-          zip -qr ../../lawyers_bh-web.zip .
-          cd ../..
+          DEFINE=""
+          if [ -n "$API_BASE_URL" ]; then DEFINE="--dart-define=API_BASE_URL=$API_BASE_URL"; fi
+          flutter build apk --debug $DEFINE
     artifacts:
-      - lawyers_bh-web.zip
-      - build/web/**
-    publishing:
-      email:
-        recipients:
-          - dev-team@lawyers.bh
-        notify:
-          success: true
-          failure: true
+      - build/app/outputs/flutter-apk/*.apk
+
+  # ------------------------------------------------------------------
+  # 2) Signed release APK/AAB — for real distribution (Play Store or
+  #    direct install). Requires the `lawyers_bh_keystore` signing identity
+  #    created in the Codemagic UI, and API_BASE_URL set to the production
+  #    API host as an encrypted variable.
+  # ------------------------------------------------------------------
+  android-release:
+    name: Android - Release APK + AAB (signed)
+    max_build_duration: 30
+    instance_type: linux_x2
+    environment:
+      flutter: stable
+      android_signing:
+        - lawyers_bh_keystore   # create this signing identity in Codemagic UI first
+      groups:
+        - lawyers_bh_prod        # holds API_BASE_URL (mark it "secure" in Codemagic)
+    scripts:
+      - name: Require the production API host
+        script: |
+          if [ -z "$API_BASE_URL" ]; then
+            echo "API_BASE_URL is not set. Add it as an encrypted variable in the"
+            echo "lawyers_bh_prod group (or edit this workflow) before releasing."
+            exit 1
+          fi
+      - name: Generate android/ios platform folders if missing
+        script: |
+          if [ ! -d "android" ]; then
+            flutter create --platforms=android,ios --org com.superai.lawyersbh --project-name lawyers_bh_client .
+          fi
+      - name: Remove the flutter create template test
+        script: |
+          # `flutter create` writes a counter-app widget test that references a
+          # MyApp class this project does not have. Left in place it fails
+          # analysis and any test run.
+          rm -f test/widget_test.dart
+      - name: Configure Android release signing
+        script: python3 tool/configure_android_signing.py
+      - name: Get Flutter packages
+        script: flutter pub get
+      - name: Analyze
+        script: flutter analyze
+      - name: Run tests
+        script: flutter test
+      - name: Build release AAB (Play Store) and APK (direct install)
+        script: |
+          flutter build appbundle --release --dart-define=API_BASE_URL=$API_BASE_URL
+          flutter build apk --release --dart-define=API_BASE_URL=$API_BASE_URL
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab
+      - build/app/outputs/flutter-apk/*.apk
+
+  # ------------------------------------------------------------------
+  # 3) iOS IPA — optional, needs an active Apple Developer account
+  #    ($99/year) and code signing set up in Codemagic (automatic
+  #    signing via an App Store Connect API key is the easiest way).
+  #    Leave this workflow disabled/ignored until that's ready.
+  # ------------------------------------------------------------------
+  ios-release:
+    name: iOS - Release IPA (needs Apple Developer account)
+    max_build_duration: 40
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      ios_signing:
+        distribution_type: app_store   # or ad_hoc for direct install without App Store
+        bundle_identifier: com.superai.lawyersbh.lawyersBhClient
+      groups:
+        - lawyers_bh_prod              # holds API_BASE_URL (secure)
+    scripts:
+      - name: Require the production API host
+        script: |
+          if [ -z "$API_BASE_URL" ]; then
+            echo "API_BASE_URL is not set; add it to the lawyers_bh_prod group."
+            exit 1
+          fi
+      - name: Generate android/ios platform folders if missing
+        script: |
+          if [ ! -d "ios" ]; then
+            flutter create --platforms=android,ios --org com.superai.lawyersbh --project-name lawyers_bh_client .
+          fi
+      - name: Remove the flutter create template test
+        script: |
+          # `flutter create` writes a counter-app widget test that references a
+          # MyApp class this project does not have. Left in place it fails
+          # analysis and any test run.
+          rm -f test/widget_test.dart
+      - name: Get Flutter packages
+        script: flutter pub get
+      - name: Analyze
+        script: flutter analyze
+      - name: Run tests
+        script: flutter test
+      - name: Set up code signing
+        script: xcode-project use-profiles
+      - name: Build IPA
+        script: flutter build ipa --release --dart-define=API_BASE_URL=$API_BASE_URL --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa

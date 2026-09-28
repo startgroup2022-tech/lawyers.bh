@@ -1,94 +1,9 @@
+# Kept in the repository (unlike the one `flutter create` writes at build
+# time) so the lint rules are identical locally and on CI.
 include: package:flutter_lints/flutter.yaml
-
-linter:
-  rules:
-    # Critical
-    - always_declare_return_types
-    - always_put_required_named_parameters_first
-    - annotate_overrides
-    - avoid_dynamic_calls
-    - avoid_empty_else
-    - avoid_init_to_null
-    - avoid_null_checks_in_equality_operators
-    - avoid_relative_lib_imports
-    - avoid_return_types_on_setters
-    - avoid_types_as_parameter_names
-    - cancel_subscriptions
-    - close_sinks
-    - control_flow_in_finally
-    - empty_statements
-    - hash_and_equals
-    - no_duplicate_case_values
-    - no_logic_in_create_state
-    - prefer_relative_imports
-    - test_types_in_equals
-    - throw_in_finally
-    - unnecessary_statements
-    - use_key_in_widget_constructors
-
-    # Style
-    - always_use_package_imports
-    - avoid_print
-    - avoid_redundant_argument_values
-    - avoid_unnecessary_containers
-    - avoid_web_libraries_in_flutter
-    - library_prefixes
-    - prefer_adjacent_string_concatenation
-    - prefer_collection_literals
-    - prefer_conditional_assignment
-    - prefer_const_constructors
-    - prefer_const_constructors_in_immutables
-    - prefer_const_declarations
-    - prefer_const_literals_to_create_immutables
-    - prefer_final_fields
-    - prefer_final_in_for_each
-    - prefer_final_locals
-    - prefer_function_declarations_over_variables
-    - prefer_generic_function_type_aliases
-    - prefer_if_null_operators
-    - prefer_inlined_adds
-    - prefer_interpolation_to_compose_strings
-    - prefer_is_empty
-    - prefer_is_not_empty
-    - prefer_iterable_whereType
-    - prefer_null_aware_operators
-    - prefer_spread_collections
-    - prefer_typing_uninitialized_variables
-    - sized_box_for_whitespace
-    - sort_child_properties_last
-    - unnecessary_await_in_return
-    - unnecessary_brace_in_string_interps
-    - unnecessary_constructor_name
-    - unnecessary_final
-    - unnecessary_getters_setters
-    - unnecessary_lambdas
-    - unnecessary_new
-    - unnecessary_null_aware_assignments
-    - unnecessary_null_in_if_null_operators
-    - unnecessary_nullable_for_final_variable_declarations
-    - unnecessary_overrides
-    - unnecessary_parenthesis
-    - unnecessary_raw_strings
-    - unnecessary_string_escapes
-    - unnecessary_string_interpolations
-    - use_build_context_synchronously
-    - use_full_hex_values_for_flutter_colors
-    - use_if_null_to_convert_nulls_to_bools
-    - use_late
-    - use_named_constants
-    - use_string_buffers
-    - use_super_parameters
 
 analyzer:
   exclude:
-    - "**/*.g.dart"
-    - "**/*.freezed.dart"
-    - "**/*.gr.dart"
-    - "build/**"
-    - ".dart_tool/**"
-  errors:
-    invalid_annotation_target: ignore
-    unused_import: warning
-    unused_field: warning
-    unused_local_variable: warning
-    dead_code: warning
+    - build/**
+    - android/**
+    - ios/**

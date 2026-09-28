@@ -1,6 +1,0 @@
-// Production Configuration
-#include "Release.xcconfig"
-
-PRODUCT_BUNDLE_IDENTIFIER = com.lawyersbh.app
-PRODUCT_NAME = $(inherited)
-ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon

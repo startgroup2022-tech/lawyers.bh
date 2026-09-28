@@ -1,8 +1,0 @@
-# Android Signing Configuration
-# Copy this file to key.properties and fill in actual values
-# DO NOT COMMIT THIS FILE TO VERSION CONTROL
-
-storeFile=../keystore/release.keystore
-storePassword=your-store-password
-keyAlias=your-key-alias
-keyPassword=your-key-password

@@ -1,74 +1,36 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:provider/provider.dart';
 
-import 'core/constants/app_constants.dart';
-import 'core/theme/app_theme.dart';
-import 'core/router/app_router.dart';
-import 'core/localization/app_localizations.dart';
-import 'core/di/service_locator.dart';
-import 'core/utils/app_logger.dart';
+import 'providers/app_state.dart';
+import 'screens/splash_screen.dart';
+import 'theme/app_theme.dart';
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  await dotenv.load(fileName: '.env');
-
-  await setupServiceLocator();
-
-  AppLogger.init();
-
-  runApp(
-    const ProviderScope(
-      child: LawyersBHApp(),
-    ),
-  );
+void main() {
+  runApp(const LawyersBhApp());
 }
 
-class LawyersBHApp extends ConsumerWidget {
-  const LawyersBHApp({super.key});
+class LawyersBhApp extends StatelessWidget {
+  const LawyersBhApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final router = ref.watch(appRouterProvider);
-
-    return ScreenUtilInit(
-      designSize: const Size(392, 852),
-      minTextAdapt: true,
-      splitScreenMode: true,
-      builder: (context, child) {
-        return MaterialApp.router(
-          title: AppConstants.appName,
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          themeMode: ThemeMode.light,
-          locale: const Locale('ar'),
-          supportedLocales: AppLocalizations.supportedLocales,
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          routerConfig: router,
-          builder: (context, child) {
-            return Directionality(
-              textDirection: TextDirection.rtl,
-              child: MediaQuery(
-                data: MediaQuery.of(context).copyWith(
-                  textScaler: TextScaler.linear(
-                    MediaQuery.of(context).textScaler.scale(1.0).clamp(0.8, 1.2),
-                  ),
-                ),
-                child: child!,
-              ),
-            );
-          },
-        );
-      },
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => AppState(),
+      child: MaterialApp(
+        title: 'محامون البحرين',
+        debugShowCheckedModeBanner: false,
+        theme: buildAppTheme(),
+        locale: const Locale('ar'),
+        supportedLocales: const [Locale('ar'), Locale('en')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        builder: (context, child) => Directionality(textDirection: TextDirection.rtl, child: child!),
+        home: const SplashScreen(),
+      ),
     );
   }
 }
