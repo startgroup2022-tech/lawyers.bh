@@ -38,7 +38,11 @@ enum BootstrapResult {
 }
 
 class AppState extends ChangeNotifier {
-  final ApiClient api = ApiClient();
+  AppState({ApiClient? apiClient}) : api = apiClient ?? ApiClient() {
+    api.onAuthRejection = _handleAuthRejection;
+  }
+
+  final ApiClient api;
   late final AuthService auth = AuthService(api);
   late final LawyersService lawyers = LawyersService(api);
   late final CaseService cases = CaseService(api);
@@ -120,6 +124,7 @@ class AppState extends ChangeNotifier {
     await prefs.setString(_tokenPrefsKey, token);
     api.setToken(token);
     isGuest = false;
+    sessionExpired = false;
 
     // The OTP response carries the primary role only. Fetch the full identity
     // so `roles`/`permissions` are populated before the shell decides which
@@ -157,6 +162,23 @@ class AppState extends ChangeNotifier {
   }
 
   bool get isLoggedIn => currentUser != null;
+
+  /// Set when the backend rejected the session mid-use (a 401 on any call).
+  /// The shell listens for this and routes back to login with a notice, so an
+  /// expired token never leaves the user staring at a failed screen.
+  bool sessionExpired = false;
+
+  void _handleAuthRejection() {
+    // Only a signed-in session can expire; ignore rejections while logged out
+    // (e.g. a wrong OTP code, which the login screen reports itself).
+    if (currentUser == null) return;
+    sessionExpired = true;
+    currentUser = null;
+    isGuest = false;
+    api.setToken(null);
+    SharedPreferences.getInstance().then((p) => p.remove(_tokenPrefsKey));
+    notifyListeners();
+  }
 
   /// True when the backend definitively rejected the session, as opposed to
   /// being unreachable. `statusCode == 0` marks a transport failure.

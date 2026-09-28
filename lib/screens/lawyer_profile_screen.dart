@@ -66,9 +66,15 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
       body: FutureBuilder<Lawyer>(
         future: _future,
         builder: (context, snap) {
-          if (!snap.hasData) {
+          if (snap.connectionState != ConnectionState.done) {
             return const SafeArea(
                 child: Center(child: CircularProgressIndicator()));
+          }
+          if (snap.hasError || !snap.hasData) {
+            return _LoadError(
+              onRetry: () => setState(() => _future =
+                  context.read<AppState>().lawyers.detail(widget.lawyerId)),
+            );
           }
           final l = snap.data!;
           return CustomScrollView(
@@ -308,6 +314,34 @@ class _LawyerProfileScreenState extends State<LawyerProfileScreen> {
         Text(label,
             style: AppTextStyles.tajawal(size: 10, color: AppColors.ink2)),
       ],
+    );
+  }
+}
+
+class _LoadError extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _LoadError({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off_outlined, size: 40, color: AppColors.ink3),
+              const SizedBox(height: 12),
+              Text('تعذّر تحميل بيانات المحامي',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.tajawal(size: 12.5, color: AppColors.ink2)),
+              const SizedBox(height: 12),
+              ElevatedButton(onPressed: onRetry, child: const Text('إعادة المحاولة')),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

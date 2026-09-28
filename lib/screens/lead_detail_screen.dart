@@ -55,7 +55,6 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
         setState(() {
           _lead = lead;
           _activities = activities;
-          _loading = false;
         });
       }
     } on ApiException catch (e) {
@@ -65,9 +64,17 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
         setState(() {
           _error = e.message ?? 'تعذّر تحميل بيانات العميل المحتمل';
           _activitiesError = e.message;
-          _loading = false;
         });
       }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _error = 'تعذّر تحميل بيانات العميل المحتمل';
+          _activitiesError = 'تعذّر تحميل النشاط';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 

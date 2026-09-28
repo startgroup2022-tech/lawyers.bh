@@ -52,19 +52,13 @@ class _LeadPipelineScreenState extends State<LeadPipelineScreen> {
     });
     try {
       final leads = await context.read<AppState>().leads.list(status: _status);
-      if (mounted) {
-        setState(() {
-          _leads = leads;
-          _loading = false;
-        });
-      }
+      if (mounted) setState(() => _leads = leads);
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.message ?? 'تعذّر تحميل العملاء المحتملين';
-          _loading = false;
-        });
-      }
+      if (mounted) setState(() => _error = e.message ?? 'تعذّر تحميل العملاء المحتملين');
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذّر تحميل العملاء المحتملين');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 

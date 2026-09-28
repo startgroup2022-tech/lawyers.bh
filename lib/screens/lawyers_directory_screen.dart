@@ -26,9 +26,18 @@ class _LawyersDirectoryScreenState extends State<LawyersDirectoryScreen> {
   @override
   void initState() {
     super.initState();
-    final appState = context.read<AppState>();
-    appState.lawyers.categories().then((c) => setState(() => _categories = c));
-    _future = appState.lawyers.search();
+    _loadCategories();
+    _future = context.read<AppState>().lawyers.search();
+  }
+
+  void _loadCategories() {
+    context.read<AppState>().lawyers.categories().then((c) {
+      if (mounted) setState(() => _categories = c);
+    }).catchError((_) {
+      // A failed category list must not break the directory; the search below
+      // still works without the filter chips.
+      if (mounted) setState(() => _categories = []);
+    });
   }
 
   void _reload() {
@@ -103,7 +112,23 @@ class _LawyersDirectoryScreenState extends State<LawyersDirectoryScreen> {
                   }
                   if (snap.hasError) {
                     return Center(
-                      child: Text('تعذّر تحميل النتائج', style: AppTextStyles.tajawal(color: AppColors.ink2)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.cloud_off_outlined, size: 40, color: AppColors.ink3),
+                            const SizedBox(height: 12),
+                            Text('تعذّر تحميل النتائج',
+                                textAlign: TextAlign.center,
+                                style: AppTextStyles.tajawal(color: AppColors.ink2)),
+                            const SizedBox(height: 12),
+                            ElevatedButton(
+                                onPressed: _reload,
+                                child: const Text('إعادة المحاولة')),
+                          ],
+                        ),
+                      ),
                     );
                   }
                   final list = snap.data!;

@@ -57,19 +57,13 @@ class _LawyerNetworkScreenState extends State<LawyerNetworkScreen> {
           .read<AppState>()
           .lawyers
           .search(categoryId: _categoryId, query: _query);
-      if (mounted) {
-        setState(() {
-          _lawyers = list;
-          _loading = false;
-        });
-      }
+      if (mounted) setState(() => _lawyers = list);
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.message ?? 'تعذّر تحميل المحامين';
-          _loading = false;
-        });
-      }
+      if (mounted) setState(() => _error = e.message ?? 'تعذّر تحميل المحامين');
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذّر تحميل المحامين');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 

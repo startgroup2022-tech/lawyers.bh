@@ -19,6 +19,10 @@ class _CaseTrackingScreenState extends State<CaseTrackingScreen> {
   @override
   void initState() {
     super.initState();
+    _load();
+  }
+
+  void _load() {
     _future = context.read<AppState>().cases.caseDetail(widget.caseId);
   }
 
@@ -29,7 +33,12 @@ class _CaseTrackingScreenState extends State<CaseTrackingScreen> {
       body: FutureBuilder<LegalCase>(
         future: _future,
         builder: (context, snap) {
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+          if (snap.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snap.hasError || !snap.hasData) {
+            return _CaseLoadError(onRetry: () => setState(_load));
+          }
           final c = snap.data!;
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -89,6 +98,32 @@ class _CaseTrackingScreenState extends State<CaseTrackingScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _CaseLoadError extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _CaseLoadError({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_outlined, size: 40, color: AppColors.ink3),
+            const SizedBox(height: 12),
+            Text('تعذّر تحميل القضية',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.tajawal(size: 12.5, color: AppColors.ink2)),
+            const SizedBox(height: 12),
+            ElevatedButton(onPressed: onRetry, child: const Text('إعادة المحاولة')),
+          ],
+        ),
       ),
     );
   }

@@ -100,6 +100,8 @@ class _LawyerProfileEditorScreenState extends State<LawyerProfileEditorScreen> {
       _profileStatus = p.profileStatus;
     } on ApiException catch (e) {
       _loadError = e.message ?? 'تعذّر تحميل الملف المهني';
+    } catch (_) {
+      _loadError = 'تعذّر تحميل الملف المهني';
     } finally {
       if (mounted) setState(() => _loading = false);
     }

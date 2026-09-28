@@ -74,7 +74,9 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
       setState(() => _otpSent = true);
       _codeFocus.requestFocus();
     } on ApiException catch (e) {
-      setState(() => _error = _friendlyError(e.error));
+      if (mounted) setState(() => _error = _friendlyError(e.error));
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذّر الإرسال، حاول مرة أخرى');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -99,7 +101,9 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
       Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const RootShell()));
     } on ApiException catch (e) {
-      setState(() => _error = _friendlyError(e.error));
+      if (mounted) setState(() => _error = _friendlyError(e.error));
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذّر التحقق من الرمز، حاول مرة أخرى');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -108,10 +112,14 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
   /// Continues into the app without an account. No token, no fake user.
   Future<void> _continueAsGuest() async {
     setState(() => _guestLoading = true);
-    await context.read<AppState>().continueAsGuest();
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const ClientShell(guest: true)));
+    try {
+      await context.read<AppState>().continueAsGuest();
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const ClientShell(guest: true)));
+    } finally {
+      if (mounted) setState(() => _guestLoading = false);
+    }
   }
 
   String _friendlyError(String code) {

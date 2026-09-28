@@ -43,16 +43,14 @@ class _CaseWorkspaceScreenState extends State<CaseWorkspaceScreen> {
       if (mounted) {
         setState(() {
           _case = c;
-          _loading = false;
         });
       }
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.message ?? 'تعذّر تحميل القضية';
-          _loading = false;
-        });
-      }
+      if (mounted) setState(() => _error = e.message ?? 'تعذّر تحميل القضية');
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذّر تحميل القضية');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -766,16 +764,14 @@ class _DocumentsTabState extends State<_DocumentsTab> {
       if (mounted) {
         setState(() {
           _docs = docs.map((d) => CaseDocLite(d.id, d.title, d.categoryName, d.currentVersion)).toList();
-          _loading = false;
         });
       }
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.message ?? 'تعذّر تحميل المستندات';
-          _loading = false;
-        });
-      }
+      if (mounted) setState(() => _error = e.message ?? 'تعذّر تحميل المستندات');
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذّر تحميل المستندات');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -857,19 +853,15 @@ mixin _TabStateMixin<T, W extends StatefulWidget> on State<W> {
     });
     try {
       final data = await fetch();
-      if (mounted) {
-        setState(() {
-          _data = data;
-          _loading = false;
-        });
-      }
+      if (mounted) setState(() => _data = data);
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.message ?? 'تعذّر تحميل البيانات';
-          _loading = false;
-        });
-      }
+      if (mounted) setState(() => _error = e.message ?? 'تعذّر تحميل البيانات');
+    } catch (_) {
+      // A parse/cast failure is not an ApiException; it must still clear the
+      // spinner, otherwise the tab stays loading forever.
+      if (mounted) setState(() => _error = 'تعذّر تحميل البيانات');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 

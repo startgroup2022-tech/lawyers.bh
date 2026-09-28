@@ -42,7 +42,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
       if (!mounted) return;
       setState(() {
         _conversations = list;
-        _loading = false;
       });
       final target = widget.initialConversationId;
       if (target != null) {
@@ -50,11 +49,11 @@ class _MessagesScreenState extends State<MessagesScreen> {
         if (matches.isNotEmpty) _open(matches.first);
       }
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.message ?? 'تعذّر تحميل المحادثات';
-        _loading = false;
-      });
+      if (mounted) setState(() => _error = e.message ?? 'تعذّر تحميل المحادثات');
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذّر تحميل المحادثات');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -208,14 +207,13 @@ class _MessageThreadScreenState extends State<MessageThreadScreen> {
       if (!mounted) return;
       setState(() {
         _messages = list;
-        _loading = false;
       });
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.message ?? 'تعذّر تحميل الرسائل';
-        _loading = false;
-      });
+      if (mounted) setState(() => _error = e.message ?? 'تعذّر تحميل الرسائل');
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذّر تحميل الرسائل');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 

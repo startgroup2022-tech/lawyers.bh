@@ -42,19 +42,13 @@ class _LawyerCasesScreenState extends State<LawyerCasesScreen> {
     });
     try {
       final cases = await context.read<AppState>().cases.myCases();
-      if (mounted) {
-        setState(() {
-          _cases = cases;
-          _loading = false;
-        });
-      }
+      if (mounted) setState(() => _cases = cases);
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.message ?? 'تعذّر تحميل القضايا';
-          _loading = false;
-        });
-      }
+      if (mounted) setState(() => _error = e.message ?? 'تعذّر تحميل القضايا');
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذّر تحميل القضايا');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 

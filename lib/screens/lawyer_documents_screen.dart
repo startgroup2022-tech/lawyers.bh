@@ -44,19 +44,13 @@ class _LawyerDocumentsScreenState extends State<LawyerDocumentsScreen> {
     });
     try {
       final docs = await context.read<AppState>().documents.list(scope: _scope);
-      if (mounted) {
-        setState(() {
-          _docs = docs;
-          _loading = false;
-        });
-      }
+      if (mounted) setState(() => _docs = docs);
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.message ?? 'تعذّر تحميل المستندات';
-          _loading = false;
-        });
-      }
+      if (mounted) setState(() => _error = e.message ?? 'تعذّر تحميل المستندات');
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذّر تحميل المستندات');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 

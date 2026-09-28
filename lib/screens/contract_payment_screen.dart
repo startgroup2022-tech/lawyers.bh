@@ -152,7 +152,30 @@ class _ContractPaymentScreenState extends State<ContractPaymentScreen> {
       body: FutureBuilder<LegalContract>(
         future: _future,
         builder: (context, snap) {
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+          if (snap.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snap.hasError || !snap.hasData) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.cloud_off_outlined, size: 40, color: AppColors.ink3),
+                    const SizedBox(height: 12),
+                    Text('تعذّر تحميل العقد',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.tajawal(size: 12.5, color: AppColors.ink2)),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                        onPressed: () => setState(_reload),
+                        child: const Text('إعادة المحاولة')),
+                  ],
+                ),
+              ),
+            );
+          }
           final c = snap.data!;
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),

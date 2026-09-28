@@ -47,13 +47,17 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
       _error = null;
     } on ApiException catch (e) {
       _error = e.message ?? 'تعذّر تحميل أوقات العمل';
+    } catch (_) {
+      _error = 'تعذّر تحميل أوقات العمل';
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
     try {
       _blocked = await app.lawyer.blockedDates();
-    } on ApiException {
+    } catch (_) {
       _blocked = const [];
     }
-    if (mounted) setState(() => _loading = false);
+    if (mounted) setState(() {});
   }
 
   Future<void> _save() async {

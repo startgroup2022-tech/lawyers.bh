@@ -21,6 +21,14 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
+  ApiClient({http.Client? httpClient, Duration? requestTimeout})
+      : _http = httpClient ?? http.Client(),
+        requestTimeout = requestTimeout ?? const Duration(seconds: 20);
+
+  /// The transport. Injectable so tests can drive the real request/parse/state
+  /// code against a controlled socket without a live server.
+  final http.Client _http;
+
   /// Backend base URL, without a trailing slash.
   ///
   /// A release build must always carry a real host: the production API is
@@ -54,6 +62,11 @@ class ApiClient {
 
   void setToken(String? token) => _token = token;
 
+  /// Invoked whenever the backend rejects the session (401). Wiring this to
+  /// the app state lets an expired token discovered mid-session drop the user
+  /// back to login instead of leaving every screen showing an error.
+  void Function()? onAuthRejection;
+
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -68,45 +81,57 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> get(String path, {Map<String, dynamic>? query}) async {
-    final res = await _send(() => http.get(_uri(path, query), headers: _headers));
+    final res = await _send(() => _http.get(_uri(path, query), headers: _headers));
     return _decode(res);
   }
 
   Future<Map<String, dynamic>> post(String path, [Map<String, dynamic>? body]) async {
     final res = await _send(
-      () => http.post(_uri(path), headers: _headers, body: jsonEncode(body ?? const {})),
+      () => _http.post(_uri(path), headers: _headers, body: jsonEncode(body ?? const {})),
     );
     return _decode(res);
   }
 
   Future<Map<String, dynamic>> patch(String path, Map<String, dynamic> body) async {
     final res = await _send(
-      () => http.patch(_uri(path), headers: _headers, body: jsonEncode(body)),
+      () => _http.patch(_uri(path), headers: _headers, body: jsonEncode(body)),
     );
     return _decode(res);
   }
 
   Future<Map<String, dynamic>> put(String path, Map<String, dynamic> body) async {
     final res = await _send(
-      () => http.put(_uri(path), headers: _headers, body: jsonEncode(body)),
+      () => _http.put(_uri(path), headers: _headers, body: jsonEncode(body)),
     );
     return _decode(res);
   }
 
   Future<Map<String, dynamic>> delete(String path) async {
-    final res = await _send(() => http.delete(_uri(path), headers: _headers));
+    final res = await _send(() => _http.delete(_uri(path), headers: _headers));
     return _decode(res);
   }
 
+  /// Hard cap on a single request. Without it a socket that never answers
+  /// (dropped connection, wrong host, blocked port) leaves the caller awaiting
+  /// forever — which shows up in the UI as a spinner that never stops.
+  final Duration requestTimeout;
+
   Future<http.Response> _send(Future<http.Response> Function() request) async {
     try {
-      return await request();
+      return await request().timeout(requestTimeout);
     } on TimeoutException {
-      throw ApiException('network_timeout', 0, message: 'انتهت مهلة الاتصال بالخادم');
+      throw const ApiException('network_timeout', 0, message: 'انتهت مهلة الاتصال بالخادم');
+    } on ApiException {
+      rethrow;
     } on http.ClientException {
       // The http package surfaces connection failures (including a refused
       // socket) as ClientException, so this covers "server unreachable".
-      throw ApiException('network_error', 0, message: 'تعذّر الاتصال بالخادم');
+      throw const ApiException('network_error', 0, message: 'تعذّر الاتصال بالخادم');
+    } catch (_) {
+      // Any other transport-level failure (DNS, TLS handshake, socket close)
+      // must still surface as a typed error so callers clear their loading
+      // state instead of awaiting forever.
+      throw const ApiException('network_error', 0, message: 'تعذّر الاتصال بالخادم');
     }
   }
 
@@ -129,6 +154,11 @@ class ApiClient {
     if (!succeeded) {
       final message = json['message']?.toString();
       final error = json['error']?.toString() ?? _codeFrom(json) ?? message ?? 'unknown_error';
+      if (res.statusCode == 401) {
+        // 401 means the session is gone; 403 is a permission denial on a valid
+        // session and must not log the user out.
+        onAuthRejection?.call();
+      }
       throw ApiException(error, res.statusCode, message: message);
     }
 

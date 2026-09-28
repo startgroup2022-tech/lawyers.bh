@@ -56,29 +56,37 @@ class _LawyerDashboardScreenState extends State<LawyerDashboardScreen> {
     final app = context.read<AppState>();
 
     // Each section loads independently so one broken endpoint cannot blank the
-    // dashboard.
+    // dashboard. `finally` guarantees the spinner clears no matter what fails.
     try {
-      _profile = await app.lawyer.profile();
-      _profileError = null;
-    } on ApiException catch (e) {
-      _profileError = e.message ?? 'تعذّر تحميل الملف المهني';
-    }
+      try {
+        _profile = await app.lawyer.profile();
+        _profileError = null;
+      } on ApiException catch (e) {
+        _profileError = e.message ?? 'تعذّر تحميل الملف المهني';
+      } catch (_) {
+        _profileError = 'تعذّر تحميل الملف المهني';
+      }
 
-    try {
-      _leads = await app.leads.list();
-      _leadsError = null;
-    } on ApiException catch (e) {
-      _leadsError = e.message ?? 'تعذّر تحميل العملاء المحتملين';
-    }
+      try {
+        _leads = await app.leads.list();
+        _leadsError = null;
+      } on ApiException catch (e) {
+        _leadsError = e.message ?? 'تعذّر تحميل العملاء المحتملين';
+      } catch (_) {
+        _leadsError = 'تعذّر تحميل العملاء المحتملين';
+      }
 
-    try {
-      _cases = await app.cases.myCases();
-      _casesError = null;
-    } on ApiException catch (e) {
-      _casesError = e.message ?? 'تعذّر تحميل القضايا';
+      try {
+        _cases = await app.cases.myCases();
+        _casesError = null;
+      } on ApiException catch (e) {
+        _casesError = e.message ?? 'تعذّر تحميل القضايا';
+      } catch (_) {
+        _casesError = 'تعذّر تحميل القضايا';
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
-
-    if (mounted) setState(() => _loading = false);
   }
 
   @override
