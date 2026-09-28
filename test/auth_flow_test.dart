@@ -12,6 +12,7 @@ import 'package:lawyers_bh_client/screens/client_shell.dart';
 import 'package:lawyers_bh_client/screens/login_otp_screen.dart';
 import 'package:lawyers_bh_client/screens/root_shell.dart';
 import 'package:lawyers_bh_client/screens/splash_screen.dart';
+import 'package:lawyers_bh_client/services/api_client.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -27,10 +28,35 @@ void main() {
       expect(state.isGuest, isFalse);
     });
 
-    test('an unverifiable stored token becomes sessionExpired and is cleared', () async {
+    test('an unreachable backend keeps the stored token and reports offline', () async {
+      SharedPreferences.setMockInitialValues({'auth_token': 'stored-token'});
+      final state = AppState();
+      // There is no backend in the test, so /auth/me cannot be reached. That is
+      // a transport failure, not a rejection: the token must survive so a retry
+      // can still restore the session.
+      final result = await state.bootstrap();
+      expect(result, BootstrapResult.offline);
+      expect(state.isLoggedIn, isFalse);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('auth_token'), 'stored-token');
+    });
+
+    test('a valid stored token restores the authenticated session', () async {
+      SharedPreferences.setMockInitialValues({'auth_token': 'good-token'});
+      final state = AppState();
+      state.identityLoader = () async =>
+          AppUser(id: 1, phone: '+97339000001', role: 'client');
+      final result = await state.bootstrap();
+      expect(result, BootstrapResult.authenticated);
+      expect(state.isLoggedIn, isTrue);
+      expect(state.isProfessional, isFalse);
+    });
+
+    test('a rejected token becomes sessionExpired and is cleared', () async {
       SharedPreferences.setMockInitialValues({'auth_token': 'expired-token'});
       final state = AppState();
-      // There is no backend in the test, so /auth/me cannot validate the token.
+      state.identityLoader = () async =>
+          throw const ApiException('invalid_or_expired_token', 401);
       final result = await state.bootstrap();
       expect(result, BootstrapResult.sessionExpired);
       expect(state.isLoggedIn, isFalse);
@@ -107,6 +133,10 @@ void main() {
       final destination = splashDestination(BootstrapResult.firstRun);
       expect(destination, isA<LoginOtpScreen>());
       expect((destination as LoginOtpScreen).notice, isNull);
+    });
+
+    test('an offline backend stays on the splash so it can be retried', () {
+      expect(splashDestination(BootstrapResult.offline), isNull);
     });
   });
 

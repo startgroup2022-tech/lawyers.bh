@@ -25,21 +25,49 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _load();
+  }
+
+  void _load() {
     final appState = context.read<AppState>();
     _categoriesFuture = appState.lawyers.categories();
     _lawyersFuture = appState.lawyers.search(sort: 'rating');
+  }
+
+  Future<void> _reload() async {
+    setState(_load);
+    await Future.wait([
+      _categoriesFuture.catchError((_) => <LegalCategory>[]),
+      _lawyersFuture.catchError((_) => <Lawyer>[]),
+    ]);
   }
 
   void _openProfile(Lawyer lawyer) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => LawyerProfileScreen(lawyerId: lawyer.id)));
   }
 
+  Widget _inlineError(String message, VoidCallback onRetry) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Column(
+          children: [
+            Text(message,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.tajawal(size: 12, color: AppColors.ink2)),
+            const SizedBox(height: 8),
+            OutlinedButton(onPressed: onRetry, child: const Text('إعادة المحاولة')),
+          ],
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      child: RefreshIndicator(
+        onRefresh: _reload,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          children: [
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -82,13 +110,24 @@ class _HomeScreenState extends State<HomeScreen> {
           FutureBuilder<List<LegalCategory>>(
             future: _categoriesFuture,
             builder: (context, snap) {
-              if (!snap.hasData) {
+              if (snap.connectionState != ConnectionState.done) {
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 20),
                   child: Center(child: CircularProgressIndicator()),
                 );
               }
-              final cats = snap.data!;
+              if (snap.hasError) {
+                return _inlineError('تعذّر تحميل التخصصات', _reload);
+              }
+              final cats = snap.data ?? const <LegalCategory>[];
+              if (cats.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: Text('لا توجد تخصصات متاحة حاليًا',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.tajawal(size: 12, color: AppColors.ink2)),
+                );
+              }
               return GridView.count(
                 crossAxisCount: 4,
                 shrinkWrap: true,
@@ -114,14 +153,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               }
               if (snap.hasError) {
-                return Text('تعذّر تحميل المحامين حاليًا',
-                    style: AppTextStyles.tajawal(size: 12, color: AppColors.ink2));
+                return _inlineError('تعذّر تحميل المحامين حاليًا', _reload);
               }
-              final list = snap.data!.take(2).toList();
+              final list = (snap.data ?? const <Lawyer>[]).take(2).toList();
+              if (list.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: Text('لا يوجد محامون منشورون بعد',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.tajawal(size: 12, color: AppColors.ink2)),
+                );
+              }
               return Column(children: list.map((l) => LawyerRow(lawyer: l, onTap: () => _openProfile(l))).toList());
             },
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

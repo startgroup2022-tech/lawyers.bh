@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, kReleaseMode, TargetPlatform;
 import 'package:http/http.dart' as http;
 
 /// Thrown when the backend reports a failure.
@@ -13,7 +14,7 @@ class ApiException implements Exception {
   /// Human-readable message from the backend, when it sends one.
   final String? message;
 
-  ApiException(this.error, this.statusCode, {this.message});
+  const ApiException(this.error, this.statusCode, {this.message});
 
   @override
   String toString() => 'ApiException($statusCode): ${message ?? error}';
@@ -22,13 +23,25 @@ class ApiException implements Exception {
 class ApiClient {
   /// Backend base URL, without a trailing slash.
   ///
-  /// Override at build time so a device build can point at a LAN address:
+  /// A release build must always carry a real host: the production API is
+  /// injected at build time (Codemagic sets `API_BASE_URL` for release
+  /// workflows). `kReleaseMode` without that define would otherwise silently
+  /// point at localhost and look "connected" while every call fails, so the
+  /// canonical host is used as the release fallback. Debug/profile builds keep
+  /// the localhost convenience for day-to-day development.
+  ///
+  /// Override for a device/emulator build:
   ///   flutter run --dart-define=API_BASE_URL=http://192.168.1.10:8080
+  static const String productionBaseUrl = 'https://api.lawyers.bh';
+
   static const String _configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
 
   static String get baseUrl {
     if (_configuredBaseUrl.isNotEmpty) {
       return _configuredBaseUrl.replaceAll(RegExp(r'/+$'), '');
+    }
+    if (kReleaseMode) {
+      return productionBaseUrl;
     }
     // Android emulators reach the host through 10.0.2.2, not localhost.
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {

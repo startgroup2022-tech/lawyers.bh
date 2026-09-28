@@ -21,7 +21,14 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
   @override
   void initState() {
     super.initState();
-    _future = context.read<AppState>().cases.myContracts();
+    _load();
+  }
+
+  void _load() => _future = context.read<AppState>().cases.myContracts();
+
+  Future<void> _reload() async {
+    setState(_load);
+    await _future.catchError((_) => <LegalContract>[]);
   }
 
   (String, BadgeTone) _statusInfo(String status) {
@@ -50,8 +57,11 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
               child: FutureBuilder<List<LegalContract>>(
                 future: _future,
                 builder: (context, snap) {
-                  if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-                  final list = snap.data!;
+                  if (snap.connectionState != ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snap.hasError) return _ContractsErrorRetry(onRetry: _reload);
+                  final list = snap.data ?? const <LegalContract>[];
                   if (list.isEmpty) {
                     return Center(
                       child: Column(
@@ -113,4 +123,24 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
       ),
     );
   }
+}
+
+class _ContractsErrorRetry extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _ContractsErrorRetry({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_outlined, size: 40, color: AppColors.ink3),
+            const SizedBox(height: 10),
+            Text('تعذّر تحميل العقود من الخادم',
+                style: AppTextStyles.tajawal(size: 13, color: AppColors.ink2)),
+            const SizedBox(height: 10),
+            ElevatedButton(onPressed: onRetry, child: const Text('إعادة المحاولة')),
+          ],
+        ),
+      );
 }

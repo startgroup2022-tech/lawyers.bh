@@ -18,7 +18,14 @@ class AuthService {
 
   Future<AppUser> me() async {
     final data = await api.get('/api/v1/auth/me');
-    return AppUser.fromJson(data['user']);
+    // The endpoint returns the identity as siblings, not nested under `user`:
+    //   { "user": {...}, "roles": [...], "permissions": [...], "firm_ids": [...] }
+    // Folding them in keeps `roles`/`permissions` attached; reading only
+    // `data['user']` silently drops them and leaves `can()` always false.
+    final user = Map<String, dynamic>.from(data['user'] as Map);
+    user['roles'] = data['roles'];
+    user['permissions'] = data['permissions'];
+    return AppUser.fromJson(user);
   }
 
   Future<void> logout() => api.post('/api/v1/auth/logout');

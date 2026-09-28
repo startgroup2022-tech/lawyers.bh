@@ -21,7 +21,14 @@ class _MyCasesScreenState extends State<MyCasesScreen> {
   @override
   void initState() {
     super.initState();
-    _future = context.read<AppState>().cases.myCases();
+    _load();
+  }
+
+  void _load() => _future = context.read<AppState>().cases.myCases();
+
+  Future<void> _reload() async {
+    setState(_load);
+    await _future.catchError((_) => <LegalCase>[]);
   }
 
   (String, BadgeTone) _statusInfo(String status) {
@@ -50,8 +57,13 @@ class _MyCasesScreenState extends State<MyCasesScreen> {
               child: FutureBuilder<List<LegalCase>>(
                 future: _future,
                 builder: (context, snap) {
-                  if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-                  final list = snap.data!;
+                  if (snap.connectionState != ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snap.hasError) {
+                    return _ErrorRetry(onRetry: _reload);
+                  }
+                  final list = snap.data ?? const <LegalCase>[];
                   if (list.isEmpty) {
                     return Center(
                       child: Column(
@@ -66,7 +78,9 @@ class _MyCasesScreenState extends State<MyCasesScreen> {
                       ),
                     );
                   }
-                  return ListView.builder(
+                  return RefreshIndicator(
+                    onRefresh: _reload,
+                    child: ListView.builder(
                     itemCount: list.length,
                     itemBuilder: (context, i) {
                       final c = list[i];
@@ -101,7 +115,8 @@ class _MyCasesScreenState extends State<MyCasesScreen> {
                         ),
                       );
                     },
-                  );
+                  ),
+                );
                 },
               ),
             ),
@@ -110,4 +125,25 @@ class _MyCasesScreenState extends State<MyCasesScreen> {
       ),
     );
   }
+}
+
+/// Shared "the API call failed" state with a retry action.
+class _ErrorRetry extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _ErrorRetry({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_outlined, size: 40, color: AppColors.ink3),
+            const SizedBox(height: 10),
+            Text('تعذّر تحميل البيانات من الخادم',
+                style: AppTextStyles.tajawal(size: 13, color: AppColors.ink2)),
+            const SizedBox(height: 10),
+            ElevatedButton(onPressed: onRetry, child: const Text('إعادة المحاولة')),
+          ],
+        ),
+      );
 }

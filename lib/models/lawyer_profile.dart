@@ -137,7 +137,11 @@ class LawyerSpecialization {
   });
 
   factory LawyerSpecialization.fromJson(Map<String, dynamic> json) => LawyerSpecialization(
-        id: int.parse(json['id'].toString()),
+        // `/lawyer/profile` returns the link row, where `id` is the join-table
+        // id and `specialization_id` is the real specialization. Prefer the
+        // latter so the value can be sent back to the sync endpoints; fall back
+        // to `id` for directory payloads where the two coincide.
+        id: int.parse('${json['specialization_id'] ?? json['id']}'),
         nameAr: json['name_ar'] ?? '',
         isPrimary: json['is_primary'] == true || json['is_primary'] == 1,
         yearsExperience: int.tryParse('${json['years_experience']}') ?? 0,

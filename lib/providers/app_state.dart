@@ -30,6 +30,11 @@ enum BootstrapResult {
 
   /// A stored token existed but the backend rejected it (expired/invalid).
   sessionExpired,
+
+  /// A stored token existed but the backend could not be reached. The session
+  /// is kept — a later retry may still succeed — and the user is shown an
+  /// offline state rather than being forced to log in again.
+  offline,
 }
 
 class AppState extends ChangeNotifier {
@@ -50,6 +55,11 @@ class AppState extends ChangeNotifier {
   AppUser? currentUser;
   bool isBootstrapping = true;
 
+  /// Test seam: when set, [bootstrap] resolves the stored-session identity
+  /// through this instead of the live `/auth/me` call. Lets tests exercise the
+  /// accepted/rejected/offline branches without a running backend.
+  Future<AppUser> Function()? identityLoader;
+
   /// True once the user asked to browse without an account.
   ///
   /// Guest is purely a local UI state; it is never a token and never a user.
@@ -69,17 +79,29 @@ class AppState extends ChangeNotifier {
     if (token != null && token.isNotEmpty) {
       api.setToken(token);
       try {
-        currentUser = await auth.me();
+        currentUser = await (identityLoader ?? auth.me)();
         isGuest = false;
         await prefs.remove(_guestPrefsKey);
         result = BootstrapResult.authenticated;
+      } on ApiException catch (e) {
+        // Only a definitive auth rejection invalidates the session. A network
+        // or server-side failure must not; treat it as a temporary outage and
+        // keep the stored token so a retry can restore the session.
+        if (_isAuthRejection(e)) {
+          await prefs.remove(_tokenPrefsKey);
+          api.setToken(null);
+          currentUser = null;
+          isGuest = false;
+          result = BootstrapResult.sessionExpired;
+        } else {
+          currentUser = null;
+          isGuest = false;
+          result = BootstrapResult.offline;
+        }
       } catch (_) {
-        // Expired or invalid token: clear it and ask for a fresh login.
-        await prefs.remove(_tokenPrefsKey);
-        api.setToken(null);
         currentUser = null;
         isGuest = false;
-        result = BootstrapResult.sessionExpired;
+        result = BootstrapResult.offline;
       }
     } else if (prefs.getBool(_guestPrefsKey) == true) {
       // The user chose guest browsing on a previous launch; restore it.
@@ -135,4 +157,18 @@ class AppState extends ChangeNotifier {
   }
 
   bool get isLoggedIn => currentUser != null;
+
+  /// True when the backend definitively rejected the session, as opposed to
+  /// being unreachable. `statusCode == 0` marks a transport failure.
+  static bool _isAuthRejection(ApiException e) {
+    if (e.statusCode == 401 || e.statusCode == 403) return true;
+    return const {
+      'unauthenticated',
+      'unauthorized',
+      'invalid_token',
+      'token_expired',
+      'session_expired',
+      'auth_required',
+    }.contains(e.error);
+  }
 }

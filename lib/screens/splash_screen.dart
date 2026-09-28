@@ -12,17 +12,21 @@ import 'root_shell.dart';
 ///
 /// Kept as a pure function so the routing decision is testable on its own:
 /// auth client/lawyer → [RootShell], returning guest → guest [ClientShell],
-/// expired session / first run → [LoginOtpScreen].
-Widget splashDestination(BootstrapResult result) {
+/// expired session / first run → [LoginOtpScreen]. [BootstrapResult.offline]
+/// stays on the splash so the failure is surfaced with a retry.
+Widget? splashDestination(BootstrapResult result) {
   switch (result) {
     case BootstrapResult.authenticated:
       return const RootShell();
     case BootstrapResult.guest:
       return const ClientShell(guest: true);
     case BootstrapResult.sessionExpired:
-      return const LoginOtpScreen(notice: 'انتهت صلاحية الجلسة، الرجاء تسجيل الدخول من جديد.');
+      return const LoginOtpScreen(
+          notice: 'انتهت صلاحية الجلسة، الرجاء تسجيل الدخول من جديد.');
     case BootstrapResult.firstRun:
       return const LoginOtpScreen();
+    case BootstrapResult.offline:
+      return null;
   }
 }
 
@@ -45,6 +49,12 @@ class _SplashScreenState extends State<SplashScreen>
   late final AnimationController _controller;
   late final Animation<double> _fade;
   late final Animation<double> _scale;
+
+  /// Set when the stored session could not be validated because the backend
+  /// was unreachable; the splash shows the failure and a retry instead of
+  /// routing with a guess.
+  String? _bootError;
+  bool _retrying = false;
 
   @override
   void initState() {
@@ -69,18 +79,27 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
-  Future<void> _boot() async {
+  Future<void> _boot({bool revealBrand = true}) async {
     final appState = context.read<AppState>();
-    // Run the real session restore and a short brand reveal together, so the
-    // splash never lingers longer than necessary.
-    final results = await Future.wait([
-      appState.bootstrap(),
-      Future<void>.delayed(const Duration(milliseconds: 1100)),
-    ]);
+    // Run the real session restore and, on first launch, a short brand reveal
+    // together so the splash never lingers longer than necessary.
+    final delay =
+        Future<void>.delayed(Duration(milliseconds: revealBrand ? 1100 : 0));
+    final results = await Future.wait([appState.bootstrap(), delay]);
     final result = results.first as BootstrapResult;
     if (!mounted) return;
 
     final next = splashDestination(result);
+    if (next == null) {
+      // Offline with a stored session: keep the user here and let them retry
+      // rather than silently discarding a possibly-valid session.
+      setState(() {
+        _bootError =
+            'تعذّر الاتصال بالخادم. تحقّق من اتصالك بالإنترنت ثم أعد المحاولة.';
+        _retrying = false;
+      });
+      return;
+    }
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
@@ -90,6 +109,14 @@ class _SplashScreenState extends State<SplashScreen>
             FadeTransition(opacity: animation, child: child),
       ),
     );
+  }
+
+  void _retry() {
+    setState(() {
+      _bootError = null;
+      _retrying = true;
+    });
+    _boot(revealBrand: false);
   }
 
   @override
@@ -160,17 +187,44 @@ class _SplashScreenState extends State<SplashScreen>
                 padding: const EdgeInsets.only(bottom: 44),
                 child: Column(
                   children: [
-                    const SizedBox(
-                      width: 26,
-                      height: 26,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2.4),
-                    ),
-                    const SizedBox(height: 14),
-                    Text('جارٍ تحضير جلستك…',
-                        style: AppTextStyles.tajawal(
-                            size: 12.5,
-                            color: Colors.white.withValues(alpha: 0.9))),
+                    if (_bootError == null) ...[
+                      const SizedBox(
+                        width: 26,
+                        height: 26,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2.4),
+                      ),
+                      const SizedBox(height: 14),
+                      Text('جارٍ تحضير جلستك…',
+                          style: AppTextStyles.tajawal(
+                              size: 12.5,
+                              color: Colors.white.withValues(alpha: 0.9))),
+                    ] else ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 28),
+                        child: Text(
+                          _bootError!,
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.tajawal(
+                              size: 12.5, height: 1.7, color: Colors.white),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton(
+                        onPressed: _retrying ? null : _retry,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white70),
+                        ),
+                        child: _retrying
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2))
+                            : const Text('إعادة المحاولة'),
+                      ),
+                    ],
                   ],
                 ),
               ),
