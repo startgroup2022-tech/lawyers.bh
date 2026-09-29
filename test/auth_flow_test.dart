@@ -17,6 +17,8 @@ import 'package:lawyers_bh_client/screens/lawyer_shell.dart';
 import 'package:lawyers_bh_client/screens/root_shell.dart';
 import 'package:lawyers_bh_client/screens/splash_screen.dart';
 import 'package:lawyers_bh_client/services/api_client.dart';
+import 'package:lawyers_bh_client/widgets/promo_banner.dart';
+import 'package:lawyers_bh_client/widgets/section_card.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -170,6 +172,36 @@ void main() {
       );
       await tester.pump();
       expect(find.text('انتهت صلاحية الجلسة، الرجاء تسجيل الدخول من جديد.'), findsOneWidget);
+    });
+
+    testWidgets('has no slider, category grid or services strip', (tester) async {
+      tester.view.physicalSize = const Size(1200, 3400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => AppState(),
+          child: const MaterialApp(home: LoginOtpScreen()),
+        ),
+      );
+      await tester.pump();
+
+      // The sign-in door is a compact form: no home carousel, no category
+      // grid, no services strip borrowed from the home screen.
+      expect(find.byType(PageView), findsNothing);
+      expect(find.byType(PromoBanner), findsNothing);
+      expect(find.byType(SectionGrid), findsNothing);
+      expect(find.byType(ServicesStrip), findsNothing);
+      expect(find.text('الأقسام الرئيسية'), findsNothing);
+
+      // Both doors and the sign-in/sign-up switch stay compact segmented
+      // controls, not stacked cards.
+      expect(find.text('محامٍ'), findsOneWidget);
+      expect(find.text('عميل'), findsOneWidget);
+      expect(find.text('تسجيل الدخول'), findsWidgets);
+      expect(find.text('إنشاء حساب'), findsOneWidget);
     });
   });
 
