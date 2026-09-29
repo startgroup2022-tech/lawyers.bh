@@ -6,6 +6,7 @@ import '../services/auth_gate.dart';
 import '../theme/app_theme.dart';
 import '../widgets/brand_logo.dart';
 import 'messages_screen.dart';
+import 'my_appointments_screen.dart';
 
 /// The client's account hub: identity from `GET /auth/me`, the threads they
 /// are part of, and logout. In [guest] mode it becomes a sign-in invitation
@@ -107,6 +108,15 @@ class ClientProfileScreen extends StatelessWidget {
                       user.isVerified == true ? 'موثّق' : 'بانتظار التوثيق'),
                 ],
               ),
+            ),
+            const SizedBox(height: 18),
+            _tile(
+              context,
+              Icons.event_note_outlined,
+              'مواعيدي',
+              'مواعيدك القادمة والسابقة',
+              () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const MyAppointmentsScreen())),
             ),
             const SizedBox(height: 18),
             _tile(

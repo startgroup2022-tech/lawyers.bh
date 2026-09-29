@@ -89,7 +89,8 @@ void main() {
       expect(find.text('استشارة مرئية'), findsOneWidget);
       expect(find.text('حجز موعد'), findsOneWidget);
 
-      // Capabilities without a backend route are marked, not faked.
+      // Only the capability with no client route stays marked.
+      expect(find.text('النجدة العاجلة'), findsOneWidget);
       expect(find.text('قريبًا'), findsWidgets);
 
       // Real directory data still renders below the sections.
@@ -109,7 +110,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      await tester.tap(find.text('استشارة صوتية'));
+      await tester.tap(find.text('النجدة العاجلة'));
       await tester.pump();
       expect(find.textContaining('غير متاح في التطبيق'), findsOneWidget);
     });
@@ -143,8 +144,9 @@ void main() {
       expect(find.text('lawyer@example.com'), findsOneWidget);
       expect(find.text('استشارة صوتية'), findsWidgets);
       expect(find.text('حجز موعد'), findsWidgets);
-      // Services exist but are honestly tagged as not yet available.
-      expect(find.text('قريبًا'), findsWidgets);
+      // The bookable services now route to the real flow; the fields the
+      // lawyer has not published are marked, not invented.
+      expect(find.text('غير منشور'), findsWidgets);
     });
 
     testWidgets('a lawyer without contact data shows an empty note, not blanks',

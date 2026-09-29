@@ -5,6 +5,7 @@ import '../models/app_appearance.dart';
 import '../models/user.dart';
 import '../services/api_client.dart';
 import '../services/appearance_service.dart';
+import '../services/appointments_service.dart';
 import '../services/auth_service.dart';
 import '../services/case_service.dart';
 import '../services/documents_service.dart';
@@ -56,6 +57,7 @@ class AppState extends ChangeNotifier {
   late final AppearanceService appearance = AppearanceService(api);
   late final LawyerAuthService lawyerAuth = LawyerAuthService(api);
   late final LawyersService lawyers = LawyersService(api);
+  late final AppointmentsService appointments = AppointmentsService(api);
   late final CaseService cases = CaseService(api);
   late final SosService sos = SosService(api);
   late final MessagesService messages = MessagesService(api);

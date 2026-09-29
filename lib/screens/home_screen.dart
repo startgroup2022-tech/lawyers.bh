@@ -4,12 +4,14 @@ import 'package:provider/provider.dart';
 import '../models/lawyer.dart';
 import '../models/user.dart';
 import '../providers/app_state.dart';
+import '../services/auth_gate.dart';
 import '../theme/app_theme.dart';
 import '../widgets/lawyer_row.dart';
 import '../widgets/promo_banner.dart';
 import '../widgets/section_card.dart';
 import '../widgets/section_title.dart';
 import '../widgets/state_views.dart';
+import 'booking_screen.dart';
 import 'lawyer_profile_screen.dart';
 
 /// The client home.
@@ -22,11 +24,11 @@ import 'lawyer_profile_screen.dart';
 ///
 /// Sections are **navigation/categories** — the persistent structure of the app
 /// (lawyers, specialisations, consultations, contracts). Bookable offerings
-/// (voice consultation, video consultation, appointments, emergency dispatch)
-/// are **services**, shown in their own strip below the categories, never mixed
-/// into the category grid. A capability with no mobile endpoint is tagged
-/// "قريبًا" and explains the gap when tapped rather than opening a fabricated
-/// screen.
+/// (voice consultation, video consultation, appointments) are **services**, shown
+/// in their own strip below the categories, never mixed into the category grid.
+/// A service opens the real booking flow; a capability with no mobile endpoint
+/// (emergency dispatch) is tagged "قريبًا" and explains the gap when tapped
+/// rather than opening a fabricated screen.
 class HomeScreen extends StatefulWidget {
   final VoidCallback onBrowseAll;
   const HomeScreen({super.key, required this.onBrowseAll});
@@ -74,6 +76,43 @@ class _HomeScreenState extends State<HomeScreen> {
       );
   }
 
+  /// Opens the real booking flow. A guest is asked to sign in first because the
+  /// booking route is authenticated; the flow then starts on the method the
+  /// shortcut named.
+  Future<void> _bookConsultation(String methodCode) async {
+    await requireSignIn(context, () async {
+      if (!mounted) return;
+      await _openBookingFlow(methodCode: methodCode);
+    }, feature: 'الاستشارة');
+  }
+
+  /// Opens the booking flow from a lawyer row, where signing in is still needed
+  /// but the method is chosen inside the flow.
+  Future<void> _openBookingFlow({String? methodCode, Lawyer? lawyer}) async {
+    if (!mounted) return;
+    final selected = lawyer ?? await _pickLawyerForBooking();
+    if (selected == null || !mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BookingScreen(lawyer: selected, initialMethodCode: methodCode),
+      ),
+    );
+    // A new booking may have been made; refresh nothing here, the directory
+    // list is unaffected. The appointments screen reloads on its own.
+  }
+
+  /// The booking flow needs a lawyer. When opened from a service shortcut the
+  /// client chooses one from the directory-backed list, so the shortcut is a
+  /// real path rather than a dead end.
+  Future<Lawyer?> _pickLawyerForBooking() async {
+    return showModalBottomSheet<Lawyer>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _LawyerPickerSheet(loader: () => context.read<AppState>().lawyers.directory()),
+    );
+  }
+
   /// Navigation categories — the app's real structure. Only destinations that
   /// exist are listed; nothing is invented to fill the grid.
   List<HomeSection> _categories() {
@@ -106,25 +145,27 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Services/actions — bookable offerings, kept out of the category grid.
+  /// The three consultation types open the real booking flow; emergency dispatch
+  /// has no client-facing route on this deployment, so it stays honestly marked.
   List<ServiceItem> _services() {
     return [
       ServiceItem(
         label: 'استشارة صوتية',
         icon: Icons.mic_none_outlined,
-        available: false,
-        onTap: () => _unavailable('الاستشارة الصوتية'),
+        available: true,
+        onTap: () => _bookConsultation('phone'),
       ),
       ServiceItem(
         label: 'استشارة مرئية',
         icon: Icons.videocam_outlined,
-        available: false,
-        onTap: () => _unavailable('الاستشارة المرئية'),
+        available: true,
+        onTap: () => _bookConsultation('video'),
       ),
       ServiceItem(
         label: 'حجز موعد',
         icon: Icons.event_available_outlined,
-        available: false,
-        onTap: () => _unavailable('حجز موعد'),
+        available: true,
+        onTap: () => _bookConsultation(''),
       ),
       ServiceItem(
         label: 'النجدة العاجلة',
@@ -231,6 +272,98 @@ class _HomeScreenState extends State<HomeScreen> {
         Text('ابحث عن محامٍ معتمد وابدأ استشارتك.',
             style: AppTextStyles.tajawal(size: 12, color: AppColors.ink2)),
       ],
+    );
+  }
+}
+
+/// A simple bottom sheet listing lawyers from the real directory so a service
+/// shortcut can resolve to a lawyer before entering the booking flow.
+class _LawyerPickerSheet extends StatefulWidget {
+  final Future<List<Lawyer>> Function() loader;
+  const _LawyerPickerSheet({required this.loader});
+
+  @override
+  State<_LawyerPickerSheet> createState() => _LawyerPickerSheetState();
+}
+
+class _LawyerPickerSheetState extends State<_LawyerPickerSheet> {
+  late Future<List<Lawyer>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = widget.loader();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      maxChildSize: 0.9,
+      minChildSize: 0.4,
+      expand: false,
+      builder: (context, controller) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.bg,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.lg)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.ink3,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: SectionTitle(title: 'اختر المحامي'),
+            ),
+            Expanded(
+              child: FutureBuilder<List<Lawyer>>(
+                future: _future,
+                builder: (context, snap) {
+                  if (snap.connectionState != ConnectionState.done) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: LawyerListSkeleton(count: 3),
+                    );
+                  }
+                  if (snap.hasError) {
+                    return Center(
+                      child: ErrorState(
+                        message: 'تعذّر تحميل المحامين',
+                        onRetry: () => setState(() => _future = widget.loader()),
+                      ),
+                    );
+                  }
+                  final list = snap.data ?? const <Lawyer>[];
+                  if (list.isEmpty) {
+                    return const Center(
+                      child: EmptyState(
+                        message: 'لا يوجد محامون منشورون بعد',
+                        icon: Icons.person_search_outlined,
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    controller: controller,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: list.length,
+                    itemBuilder: (context, i) => LawyerRow(
+                      lawyer: list[i],
+                      onTap: () => Navigator.of(context).pop(list[i]),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

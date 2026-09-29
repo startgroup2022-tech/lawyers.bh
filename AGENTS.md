@@ -106,10 +106,25 @@ details, 403 unavailable), not an error code; the client door answers with
 ### Directory
 
 - `GET /api/mobile/lawyers?countryCode=BH` → `{ok, countryCode, data:[{id (UUID),
-  countryCode, fullNameAr, fullNameEn, phone, email, status, subscriptionType}]}`.
-  Approved, active lawyers only. **No** rating, fee, bio, location, category
-  filter or per-lawyer detail route — do not invent those fields.
+  countryCode, fullNameAr, fullNameEn, phone, email, status, subscriptionType,
+  subscriptionTypes, profileImageUrl, professionalTitleAr, professionalTitleEn,
+  experienceYears, specialtyMain, specialtySubs, specialties, languages,
+  workingHours, registrationNo, registrationLevel, rating, reviewCount}]}`.
+  Approved, active, public-directory-visible lawyers only. The route reuses
+  `getPublicLawyers` (the website directory query), so photo/specialties/
+  experience/working hours/rating are the real published values; a field a
+  lawyer has not filled in arrives empty and is rendered as a gap — never
+  invent one. There is still no per-lawyer detail route and no bio,
+  qualification or city field.
 - `GET /api/mobile/legal-documents/{terms|privacy|lawyer-agreement}?locale&countryCode`
+
+### Consultation methods (public)
+
+- `GET /api/consultation-methods?countryCode=BH` →
+  `{ok, country:{code,currencyCode}, methods:[{id, code, nameAr, nameEn, price,
+  currencyCode, durationMinutes, iconKey, sortOrder}]}`. `code` is one of
+  `phone`, `whatsapp`, `video`, `office` — the booking POST validates the
+  submitted method against this same table.
 
 ### Lawyer (professional) side
 
@@ -156,12 +171,12 @@ deployment. The app must say so, not render a silent empty list:
   no client `/cases`, `/contracts`, `/leads` or `/documents`. Appointments are
   the one client booking surface (above).
 - Client-created SOS requests — only the dispatch side of SOS is exposed.
-- Per-lawyer detail — the directory is the only lawyer read for clients. There
-  is no rating, bio, experience, fee, city or specialisation field in the client
-  directory API. `LawyerProfileScreen` shows only the published directory fields
-  (name ar/en, phone, email, status, subscription type) and does **not** invent
-  the rest. (A lawyer's *own* profile has the richer fields above; a client
-  cannot read them for another lawyer.)
+- Per-lawyer detail beyond the directory — the directory now publishes the real
+  profile (photo, title, experience, specialties, languages, working hours,
+  rating), but there is still no separate `/api/mobile/lawyers/{id}` detail
+  route, and no bio, qualification or city field anywhere. `LawyerProfileScreen`
+  renders the directory's published fields and marks the ones a lawyer has not
+  filled in as "غير منشور" rather than inventing them.
 - Lawyer specialisation/service catalogues — no mobile sync endpoint.
 
 `ApiException.featureUnavailable()` (code `feature_not_available`, 501) is the
@@ -172,10 +187,17 @@ state from hiding a missing feature.
 
 `home_screen.dart` orders the screen as welcome header → short banner → **main
 sections grid** → featured lawyers. A section is either wired to a real
-destination (directory, consult list, services → the lawyer directory) or marked
-`available: false`, which renders a "قريبًا" tag and a snackbar naming the
-missing API when tapped. Voice consultation, booking and emergency dispatch are
-in the second group on purpose — do not point them at a fabricated screen.
+destination or marked `available: false`, which renders a "قريبًا" tag and a
+snackbar naming the missing API when tapped. The three service shortcuts — voice
+consultation, video consultation and booking — now open the real
+`BookingScreen` flow (method catalogue → date → backend slots → book), asking a
+guest to sign in first. Emergency dispatch stays `available: false` on purpose:
+there is no client-facing SOS route — do not point it at a fabricated screen.
+
+`BookingScreen` / `MyAppointmentsScreen` and `AppointmentsService` are the
+client booking surface. Availability is always computed by the platform; the app
+never derives slots. A `slot_taken`/`slot_unavailable` error from the booking
+POST is authoritative and the screen refreshes its slot list.
 
 ## Conventions
 

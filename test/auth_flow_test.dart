@@ -460,10 +460,11 @@ void main() {
 
     test('every API path targets a real platform surface', () {
       final pattern = RegExp(r"""['"]/api/[^'"]*""");
-      // The platform exposes the mobile API under /api/mobile, plus the lawyer
-      // sign-in at /api/lawyers/login. Anything else is a web-portal route or a
+      // The platform exposes the mobile API under /api/mobile, the lawyer
+      // sign-in at /api/lawyers/login, and the public paid-method catalogue at
+      // /api/consultation-methods. Anything else is a web-portal route or a
       // route that does not exist.
-      const allowedExact = {'/api/lawyers/login'};
+      const allowedExact = {'/api/lawyers/login', '/api/consultation-methods'};
       for (final file in dartFiles) {
         for (final match in pattern.allMatches(file.readAsStringSync())) {
           // The match includes the opening quote.
