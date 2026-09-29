@@ -95,7 +95,7 @@ class _LawyerDashboardScreenState extends State<LawyerDashboardScreen> {
     final user = app.currentUser;
 
     return Scaffold(
-      backgroundColor: LawyerColors.canvas,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _load,

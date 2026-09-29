@@ -65,7 +65,7 @@ class _LeadPipelineScreenState extends State<LeadPipelineScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: LawyerColors.canvas,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: LawyerColors.base,
         title: const Text('العملاء المحتملون (CRM)'),

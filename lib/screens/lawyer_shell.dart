@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/app_background.dart';
 import '../widgets/brand_logo.dart';
 import 'lawyer_cases_screen.dart';
 import 'lawyer_dashboard_screen.dart';
@@ -69,7 +70,10 @@ class _LawyerShellState extends State<LawyerShell> {
           ),
         ],
       ),
-      body: IndexedStack(index: _index, children: _tabs),
+      body: AppBackgroundScope(
+        fallbackColor: LawyerColors.canvas,
+        child: IndexedStack(index: _index, children: _tabs),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),

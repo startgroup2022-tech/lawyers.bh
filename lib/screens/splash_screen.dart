@@ -82,10 +82,16 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _boot({bool revealBrand = true}) async {
     final appState = context.read<AppState>();
     // Run the real session restore and, on first launch, a short brand reveal
-    // together so the splash never lingers longer than necessary.
+    // together so the splash never lingers longer than necessary. The app
+    // background is fetched alongside them; it is public and failure-tolerant,
+    // so it never delays or blocks the hand-off.
     final delay =
         Future<void>.delayed(Duration(milliseconds: revealBrand ? 1100 : 0));
-    final results = await Future.wait([appState.bootstrap(), delay]);
+    final results = await Future.wait([
+      appState.bootstrap(),
+      appState.loadAppearance(),
+      delay,
+    ]);
     final result = results.first as BootstrapResult;
     if (!mounted) return;
 

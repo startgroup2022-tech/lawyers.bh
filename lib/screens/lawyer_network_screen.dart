@@ -78,7 +78,7 @@ class _LawyerNetworkScreenState extends State<LawyerNetworkScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: LawyerColors.canvas,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Column(
           children: [

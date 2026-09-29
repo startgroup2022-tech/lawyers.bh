@@ -104,10 +104,10 @@ class AppShadows {
   ];
 }
 
-ThemeData buildAppTheme() {
+ThemeData buildAppTheme({Color? backgroundColor}) {
   final base = ThemeData.light();
   return base.copyWith(
-    scaffoldBackgroundColor: AppColors.bg,
+    scaffoldBackgroundColor: backgroundColor ?? AppColors.bg,
     colorScheme: base.colorScheme.copyWith(
       primary: AppColors.brandRed,
       secondary: AppColors.crimson,

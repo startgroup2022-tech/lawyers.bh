@@ -21,7 +21,7 @@ class LawyerMoreScreen extends StatelessWidget {
     final user = app.currentUser;
 
     return Scaffold(
-      backgroundColor: LawyerColors.canvas,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: LawyerColors.base,
         title: const Text('المزيد'),

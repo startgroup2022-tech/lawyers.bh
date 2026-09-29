@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/app_appearance.dart';
 import '../models/user.dart';
 import '../services/api_client.dart';
+import '../services/appearance_service.dart';
 import '../services/auth_service.dart';
 import '../services/case_service.dart';
 import '../services/documents_service.dart';
@@ -51,6 +53,7 @@ class AppState extends ChangeNotifier {
 
   final ApiClient api;
   late final AuthService auth = AuthService(api);
+  late final AppearanceService appearance = AppearanceService(api);
   late final LawyerAuthService lawyerAuth = LawyerAuthService(api);
   late final LawyersService lawyers = LawyersService(api);
   late final CaseService cases = CaseService(api);
@@ -66,6 +69,27 @@ class AppState extends ChangeNotifier {
 
   AppUser? currentUser;
   bool isBootstrapping = true;
+
+  /// The admin-configured app background. Starts at the default so the first
+  /// frame is never blank, then is refreshed from the backend.
+  AppAppearance appAppearance = AppAppearance.defaults;
+
+  /// Fetches the background from the backend. Called after bootstrap so the app
+  /// has already painted; a failure keeps the current/default value and is
+  /// never surfaced as an error, because the background is decoration.
+  Future<void> loadAppearance({String countryCode = 'BH'}) async {
+    AppAppearance next;
+    try {
+      next = await appearance.load(countryCode: countryCode);
+    } catch (_) {
+      // The service already falls back on API failures; this guards the rest
+      // (e.g. local storage) so a background refresh can never break startup.
+      return;
+    }
+    if (next == appAppearance) return;
+    appAppearance = next;
+    notifyListeners();
+  }
 
   /// Test seam: when set, [bootstrap] resolves the stored-session identity
   /// through this instead of the live `/auth/me` call. Lets tests exercise the

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/auth_gate.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_background.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/sos_button.dart';
 import 'home_screen.dart';
@@ -109,9 +110,11 @@ class _ClientShellState extends State<ClientShell> {
           const Padding(padding: EdgeInsets.only(left: 4), child: SosButton()),
         ],
       ),
-      body: IndexedStack(
-        index: _tabIndex,
-        children: _tabs,
+      body: AppBackgroundScope(
+        child: IndexedStack(
+          index: _tabIndex,
+          children: _tabs,
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selected,

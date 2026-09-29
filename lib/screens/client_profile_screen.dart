@@ -21,6 +21,7 @@ class ClientProfileScreen extends StatelessWidget {
 
     if (guest || user == null) {
       return Scaffold(
+        backgroundColor: Colors.transparent,
         appBar: AppBar(title: const Text('حسابي')),
         body: SafeArea(
           child: Center(
@@ -55,6 +56,7 @@ class ClientProfileScreen extends StatelessWidget {
     }
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('حسابي')),
       body: SafeArea(
         child: ListView(
