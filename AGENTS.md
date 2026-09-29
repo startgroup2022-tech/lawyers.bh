@@ -120,6 +120,28 @@ details, 403 unavailable), not an error code; the client door answers with
 - With that token: `GET /api/mobile/lawyer/session`, `/earnings`, `/withdrawals`.
 - `GET /api/mobile/communications/conversations` (lawyer session).
 
+The professional workspace also has a real mobile backend (added 2026-09):
+
+| Route | Method | Notes |
+| --- | --- | --- |
+| `/api/mobile/lawyer/profile` | GET | the lawyer's own profile + weekly availability |
+| `/api/mobile/lawyer/profile` | PATCH | profile editor; accepts the app's `snake_case` keys |
+| `/api/mobile/lawyer/availability` | GET/PUT | weekly grid; PUT is a full replacement |
+| `/api/mobile/lawyer/blocked-dates` | GET/POST/DELETE | all-day or ranged blocks |
+| `/api/mobile/lawyer/dashboard` | GET | counts + work hours |
+| `/api/mobile/lawyer/appointments` | GET | the lawyer's own appointments |
+
+Public booking reads:
+
+| Route | Method | Notes |
+| --- | --- | --- |
+| `/api/mobile/lawyers/{id}/availability?date=&countryCode=` | GET | free slots for one date |
+| `/api/mobile/client-appointments` | GET/POST | the client's appointments; POST books a slot |
+| `/api/mobile/client-appointments/{bookingId}` | DELETE | cancels the client's appointment |
+
+Ids on the platform are UUIDs, so `LawyerProfile.id`, `LawyerSpecialization.id`
+and `BlockedDate.id` are parsed as **strings**, not ints.
+
 ### Not available to the client app
 
 These are real platform features, but with **no client-facing endpoint** on this
@@ -127,17 +149,20 @@ deployment. The app must say so, not render a silent empty list:
 
 - Client messaging — `/api/mobile/communications/*` needs a lawyer session or a
   per-request SOS capability token.
-- Notifications — `/api/mobile/notifications` and `/lawyer/notifications` need a
-  lawyer/dispatch token. Only `/api/mobile/notification-preferences` is client-side.
-- Cases, contracts, bookings, payments, leads, documents — web-portal surfaces.
-  There is no client `/cases`, `/contracts`, `/bookings`, `/leads` or
-  `/documents`.
+- Notifications — `/api/mobile/notifications` is a **POST** inbox keyed by SOS
+  request capability tokens, and `/lawyer/notifications` needs a lawyer/dispatch
+  token. Only `/api/mobile/notification-preferences` is client-side.
+- Cases, contracts, payments, leads, documents — web-portal surfaces. There is
+  no client `/cases`, `/contracts`, `/leads` or `/documents`. Appointments are
+  the one client booking surface (above).
 - Client-created SOS requests — only the dispatch side of SOS is exposed.
 - Per-lawyer detail — the directory is the only lawyer read for clients. There
-  is no `/lawyers/{id}`, no rating, bio, experience, fee, city, availability or
-  specialisation field anywhere in the client API. `LawyerProfileScreen` shows
-  only the published directory fields (name ar/en, phone, email, status,
-  subscription type) and does **not** invent the rest.
+  is no rating, bio, experience, fee, city or specialisation field in the client
+  directory API. `LawyerProfileScreen` shows only the published directory fields
+  (name ar/en, phone, email, status, subscription type) and does **not** invent
+  the rest. (A lawyer's *own* profile has the richer fields above; a client
+  cannot read them for another lawyer.)
+- Lawyer specialisation/service catalogues — no mobile sync endpoint.
 
 `ApiException.featureUnavailable()` (code `feature_not_available`, 501) is the
 honest failure for these. Keep it: it is what stops a spinner or a fake empty
