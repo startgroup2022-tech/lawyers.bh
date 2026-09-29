@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
 import '../models/lawyer.dart';
 import '../theme/app_theme.dart';
 
-/// A lawyer's public profile, rendered from the directory record.
+/// A lawyer's public profile.
 ///
-/// The platform API has no per-lawyer detail route, so this screen receives the
-/// `Lawyer` already returned by `GET /api/mobile/lawyers` rather than fetching
-/// a record that does not exist. Contact actions use the real phone/email the
-/// directory publishes.
+/// The directory endpoint (`GET /api/mobile/lawyers`) publishes identity and
+/// contact fields only: name (Arabic + English), phone, email, status and
+/// subscription type. The platform exposes **no** per-lawyer detail route, so
+/// there is no rating, bio, experience, fee, city or availability to show here —
+/// and this screen does not invent any. It presents the real fields
+/// professionally and gives the two contact actions that actually work (call
+/// and email). Actions that would need a backend route the mobile API does not
+/// expose (voice consultation, booking) are shown as unavailable and say so.
 class LawyerProfileScreen extends StatelessWidget {
   final Lawyer lawyer;
   const LawyerProfileScreen({super.key, required this.lawyer});
 
-  String get _subscriptionLabel {
+  /// A human label for the lawyer's subscription tier.
+  String get _roleLabel {
     switch (lawyer.subscriptionType) {
       case 'consultant':
         return 'استشاري قانوني';
@@ -22,9 +29,29 @@ class LawyerProfileScreen extends StatelessWidget {
         return 'محكّم';
       case 'expert':
         return 'خبير';
+      case 'emergency':
+      case 'sos':
+        return 'محامي نجدة عاجلة';
       default:
         return 'محامٍ';
     }
+  }
+
+  bool get _isApproved => lawyer.status == 'approved';
+
+  void _copy(BuildContext context, String label, String value) {
+    Clipboard.setData(ClipboardData(text: value));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text('تم نسخ $label')));
+  }
+
+  void _unavailable(BuildContext context, String feature) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text('«$feature» غير متاح في التطبيق حاليًا.')),
+      );
   }
 
   @override
@@ -33,111 +60,22 @@ class LawyerProfileScreen extends StatelessWidget {
       backgroundColor: AppColors.bg,
       body: CustomScrollView(
         slivers: [
-          SliverToBoxAdapter(
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(colors: [AppColors.navy, AppColors.navyLight]),
-              ),
-              child: SafeArea(
-                bottom: false,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    InkWell(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.arrow_forward, size: 16, color: Color(0xFFCBD5E1)),
-                          const SizedBox(width: 6),
-                          Text('رجوع',
-                              style: AppTextStyles.tajawal(size: 13, color: const Color(0xFFCBD5E1))),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Center(
-                      child: CircleAvatar(
-                        radius: 33,
-                        backgroundColor: Colors.white,
-                        child: Text(lawyer.initials,
-                            style: AppTextStyles.cairo(
-                                size: 20, weight: FontWeight.w800, color: AppColors.navy)),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Center(
-                      child: Text(lawyer.name,
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.cairo(
-                              size: 16, weight: FontWeight.w800, color: Colors.white)),
-                    ),
-                    if ((lawyer.nameEn ?? '').isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Center(
-                        child: Text(lawyer.nameEn!,
-                            textAlign: TextAlign.center,
-                            style: AppTextStyles.tajawal(
-                                size: 11.5, color: const Color(0xFFC9D3E4))),
-                      ),
-                    ],
-                    const SizedBox(height: 3),
-                    Center(
-                      child: Text(_subscriptionLabel,
-                          style: AppTextStyles.tajawal(
-                              size: 11.5, color: const Color(0xFFC9D3E4))),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          _header(context),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: AppColors.line),
-                    borderRadius: BorderRadius.circular(AppRadii.lg),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _row(Icons.badge_outlined, 'الحالة', lawyer.status == 'approved' ? 'معتمد' : lawyer.status),
-                      if (lawyer.isEmergencyReady)
-                        _row(Icons.emergency_outlined, 'الخدمات', 'متاح للنجدة القانونية العاجلة'),
-                      if ((lawyer.phone ?? '').isNotEmpty)
-                        _row(Icons.call_outlined, 'الهاتف', lawyer.phone!),
-                      if ((lawyer.email ?? '').isNotEmpty)
-                        _row(Icons.mail_outline, 'البريد', lawyer.email!),
-                    ],
-                  ),
-                ),
+                _identityCard(),
                 const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.neutralBg,
-                    borderRadius: BorderRadius.circular(AppRadii.md),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.info_outline, size: 18, color: AppColors.ink2),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'لطلب استشارة، تواصل مع المحامي مباشرة عبر الهاتف أو البريد.',
-                          style: AppTextStyles.tajawal(
-                              size: 12, color: AppColors.ink2, height: 1.6),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                _primaryActions(context),
+                const SizedBox(height: 18),
+                _sectionTitle('معلومات التواصل'),
+                _contactCard(context),
+                const SizedBox(height: 18),
+                _sectionTitle('الخدمات'),
+                _servicesCard(context),
+                const SizedBox(height: 16),
+                _profileDataNotice(),
               ]),
             ),
           ),
@@ -146,13 +84,376 @@ class LawyerProfileScreen extends StatelessWidget {
     );
   }
 
+  Widget _header(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 42),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [AppColors.brandDark, AppColors.navyLight],
+          ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              InkWell(
+                onTap: () => Navigator.of(context).pop(),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.arrow_forward, size: 16, color: Color(0xFFCBD5E1)),
+                      const SizedBox(width: 6),
+                      Text('رجوع',
+                          style: AppTextStyles.tajawal(
+                              size: 13, color: const Color(0xFFCBD5E1))),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: CircleAvatar(
+                    radius: 38,
+                    backgroundColor: Colors.white,
+                    child: Text(lawyer.initials,
+                        style: AppTextStyles.cairo(
+                            size: 24, weight: FontWeight.w800, color: AppColors.navy)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: Text(lawyer.name,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.cairo(
+                        size: 18, weight: FontWeight.w800, color: Colors.white)),
+              ),
+              if ((lawyer.nameEn ?? '').isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Center(
+                  child: Text(lawyer.nameEn!,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.tajawal(
+                          size: 12, color: const Color(0xFFC9D3E4))),
+                ),
+              ],
+              const SizedBox(height: 10),
+              Center(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    _pill(_roleLabel, Icons.badge_outlined),
+                    if (_isApproved) _pill('معتمد', Icons.verified_outlined),
+                    if (lawyer.isEmergencyReady)
+                      _pill('نجدة عاجلة', Icons.emergency_outlined),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pill(String label, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: Colors.white),
+          const SizedBox(width: 5),
+          Text(label,
+              style: AppTextStyles.tajawal(
+                  size: 11.5, weight: FontWeight.w600, color: Colors.white)),
+        ],
+      ),
+    );
+  }
+
+  /// Pulls the header up over the gradient for a layered, professional look.
+  Widget _identityCard() {
+    return Transform.translate(
+      offset: const Offset(0, -26),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: Border.all(color: AppColors.line),
+          borderRadius: BorderRadius.circular(AppRadii.lg),
+          boxShadow: AppShadows.card,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _row(Icons.badge_outlined, 'الصفة المهنية', _roleLabel),
+            _row(Icons.verified_user_outlined, 'الحالة',
+                _isApproved ? 'محامٍ معتمد على المنصة' : lawyer.status),
+            if (lawyer.isEmergencyReady)
+              _row(Icons.emergency_outlined, 'الخدمات', 'متاح للنجدة القانونية العاجلة'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _primaryActions(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _unavailable(context, 'الاستشارة الصوتية'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandBlue,
+                  minimumSize: const Size.fromHeight(50),
+                ),
+                icon: const Icon(Icons.mic_none_outlined, size: 19),
+                label: const Text('استشارة صوتية'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _unavailable(context, 'حجز موعد'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandRed,
+                  minimumSize: const Size.fromHeight(50),
+                ),
+                icon: const Icon(Icons.event_available_outlined, size: 19),
+                label: const Text('حجز موعد'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'الاستشارة الصوتية وحجز المواعيد يحتاجان واجهات برمجية غير متاحة في الـ API الحالي.',
+          textAlign: TextAlign.center,
+          style: AppTextStyles.tajawal(size: 11, color: AppColors.ink3, height: 1.5),
+        ),
+      ],
+    );
+  }
+
+  Widget _contactCard(BuildContext context) {
+    final hasPhone = (lawyer.phone ?? '').isNotEmpty;
+    final hasEmail = (lawyer.email ?? '').isNotEmpty;
+    if (!hasPhone && !hasEmail) {
+      return _emptyCard('لا توجد بيانات تواصل منشورة لهذا المحامي.');
+    }
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.line),
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+      ),
+      child: Column(
+        children: [
+          if (hasPhone)
+            _contactTile(
+              context,
+              icon: Icons.call_outlined,
+              label: 'الهاتف',
+              value: lawyer.phone!,
+              actionLabel: 'نسخ',
+              onAction: () => _copy(context, 'رقم الهاتف', lawyer.phone!),
+            ),
+          if (hasEmail)
+            _contactTile(
+              context,
+              icon: Icons.mail_outline,
+              label: 'البريد الإلكتروني',
+              value: lawyer.email!,
+              actionLabel: 'نسخ',
+              onAction: () => _copy(context, 'البريد الإلكتروني', lawyer.email!),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _contactTile(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+    required String actionLabel,
+    required VoidCallback onAction,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: AppColors.neutralBg,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(icon, size: 18, color: AppColors.neutralInk),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: AppTextStyles.tajawal(size: 11, color: AppColors.ink3)),
+                const SizedBox(height: 1),
+                Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: Text(value,
+                      textAlign: TextAlign.right,
+                      style: AppTextStyles.tajawal(
+                          size: 13.5, weight: FontWeight.w600, color: AppColors.ink)),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onAction,
+            style: TextButton.styleFrom(
+              minimumSize: Size.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(actionLabel,
+                style: AppTextStyles.tajawal(size: 12, color: AppColors.brandRed)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _servicesCard(BuildContext context) {
+    final services = <({String label, IconData icon, bool available})>[
+      (label: 'استشارة قانونية', icon: Icons.chat_bubble_outline, available: false),
+      (label: 'استشارة صوتية', icon: Icons.mic_none_outlined, available: false),
+      (label: 'حجز موعد', icon: Icons.event_available_outlined, available: false),
+      if (lawyer.isEmergencyReady)
+        (label: 'نجدة قانونية عاجلة', icon: Icons.emergency_outlined, available: false),
+    ];
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.line),
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+      ),
+      child: Column(
+        children: [
+          for (final s in services)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.neutralBg,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Icon(s.icon, size: 18, color: AppColors.neutralInk),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(s.label,
+                        style: AppTextStyles.tajawal(
+                            size: 13.5, weight: FontWeight.w600)),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.neutralBg,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text('قريبًا',
+                        style: AppTextStyles.tajawal(size: 10, color: AppColors.ink2)),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _profileDataNotice() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.neutralBg,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline, size: 18, color: AppColors.ink2),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'يعرض هذا الملف البيانات المنشورة للمحامي على المنصة (الاسم، الصفة، وسائل التواصل). '
+              'النبذة والتخصصات والتقييمات والمواعيد تتطلّب واجهة تفاصيل محامٍ غير متاحة في الـ API الحالي.',
+              style: AppTextStyles.tajawal(size: 11.5, color: AppColors.ink2, height: 1.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title) => Padding(
+        padding: const EdgeInsets.only(bottom: 8, right: 2),
+        child: Text(title,
+            style: AppTextStyles.cairo(
+                size: 14, weight: FontWeight.w800, color: AppColors.navy)),
+      );
+
+  Widget _emptyCard(String message) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: Border.all(color: AppColors.line),
+          borderRadius: BorderRadius.circular(AppRadii.lg),
+        ),
+        child: Text(message,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.tajawal(size: 12.5, color: AppColors.ink2)),
+      );
+
   Widget _row(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 17, color: AppColors.navyLight),
+          Icon(icon, size: 17, color: AppColors.brandBlue),
           const SizedBox(width: 10),
           Text('$label: ',
               style: AppTextStyles.tajawal(

@@ -39,12 +39,20 @@ class LawyerRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 23,
-              backgroundColor: AppColors.navyLight,
-              child: Text(
-                lawyer.initials,
-                style: AppTextStyles.cairo(size: 14, weight: FontWeight.w800, color: Colors.white),
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(
+                color: AppColors.neutralBg,
+                shape: BoxShape.circle,
+              ),
+              child: CircleAvatar(
+                radius: 23,
+                backgroundColor: AppColors.brandDark,
+                child: Text(
+                  lawyer.initials,
+                  style: AppTextStyles.cairo(
+                      size: 14, weight: FontWeight.w800, color: Colors.white),
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -52,10 +60,21 @@ class LawyerRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(lawyer.name, style: AppTextStyles.cairo(size: 13, weight: FontWeight.w700)),
+                  Text(lawyer.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.cairo(size: 13, weight: FontWeight.w700)),
                   const SizedBox(height: 2),
-                  Text(_subscriptionLabel,
-                      style: AppTextStyles.tajawal(size: 11, color: AppColors.ink2)),
+                  Row(
+                    children: [
+                      Text(_subscriptionLabel,
+                          style: AppTextStyles.tajawal(size: 11, color: AppColors.ink2)),
+                      if (lawyer.status == 'approved') ...[
+                        const SizedBox(width: 6),
+                        const Icon(Icons.verified, size: 13, color: AppColors.green),
+                      ],
+                    ],
+                  ),
                   if (lawyer.isEmergencyReady) ...[
                     const SizedBox(height: 6),
                     const StatusBadge(label: 'نجدة عاجلة', tone: BadgeTone.green),

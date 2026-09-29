@@ -133,10 +133,24 @@ deployment. The app must say so, not render a silent empty list:
   There is no client `/cases`, `/contracts`, `/bookings`, `/leads` or
   `/documents`.
 - Client-created SOS requests — only the dispatch side of SOS is exposed.
+- Per-lawyer detail — the directory is the only lawyer read for clients. There
+  is no `/lawyers/{id}`, no rating, bio, experience, fee, city, availability or
+  specialisation field anywhere in the client API. `LawyerProfileScreen` shows
+  only the published directory fields (name ar/en, phone, email, status,
+  subscription type) and does **not** invent the rest.
 
 `ApiException.featureUnavailable()` (code `feature_not_available`, 501) is the
 honest failure for these. Keep it: it is what stops a spinner or a fake empty
 state from hiding a missing feature.
+
+## Home sections and "قريبًا"
+
+`home_screen.dart` orders the screen as welcome header → short banner → **main
+sections grid** → featured lawyers. A section is either wired to a real
+destination (directory, consult list, services → the lawyer directory) or marked
+`available: false`, which renders a "قريبًا" tag and a snackbar naming the
+missing API when tapped. Voice consultation, booking and emergency dispatch are
+in the second group on purpose — do not point them at a fabricated screen.
 
 ## Conventions
 

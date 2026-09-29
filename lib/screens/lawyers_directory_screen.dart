@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/lawyer.dart';
 import '../providers/app_state.dart';
-import '../theme/app_theme.dart';
 import '../widgets/lawyer_row.dart';
 import '../widgets/section_title.dart';
+import '../widgets/state_views.dart';
 import 'lawyer_profile_screen.dart';
 
 /// The public directory of approved lawyers, backed by `GET /api/mobile/lawyers`.
@@ -71,6 +71,7 @@ class _LawyersDirectoryScreenState extends State<LawyersDirectoryScreen> {
             const SectionTitle(title: 'دليل المحامين'),
             TextField(
               onChanged: _onQueryChanged,
+              textInputAction: TextInputAction.search,
               decoration: const InputDecoration(
                 hintText: 'ابحث بالاسم...',
                 prefixIcon: Icon(Icons.search, size: 20),
@@ -82,33 +83,28 @@ class _LawyersDirectoryScreenState extends State<LawyersDirectoryScreen> {
                 future: _future,
                 builder: (context, snap) {
                   if (snap.connectionState != ConnectionState.done) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const LoadingState(label: 'جارٍ تحميل المحامين…');
                   }
                   if (snap.hasError) {
                     return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.cloud_off_outlined, size: 40, color: AppColors.ink3),
-                            const SizedBox(height: 12),
-                            Text('تعذّر تحميل النتائج',
-                                textAlign: TextAlign.center,
-                                style: AppTextStyles.tajawal(color: AppColors.ink2)),
-                            const SizedBox(height: 12),
-                            ElevatedButton(
-                                onPressed: _reload, child: const Text('إعادة المحاولة')),
-                          ],
-                        ),
+                      child: ErrorState(
+                        message: 'تعذّر تحميل النتائج',
+                        onRetry: _reload,
                       ),
                     );
                   }
                   final list = _filter(snap.data ?? const <Lawyer>[]);
                   if (list.isEmpty) {
+                    final searching = _query.isNotEmpty;
                     return Center(
-                      child: Text('لا يوجد محامون مطابقون',
-                          style: AppTextStyles.tajawal(color: AppColors.ink2)),
+                      child: EmptyState(
+                        message: searching
+                            ? 'لا يوجد محامون مطابقون لبحثك'
+                            : 'لا يوجد محامون منشورون بعد',
+                        icon: searching
+                            ? Icons.search_off_outlined
+                            : Icons.person_search_outlined,
+                      ),
                     );
                   }
                   return ListView.builder(

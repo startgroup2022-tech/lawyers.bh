@@ -55,6 +55,12 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
   bool _lawyerMode = false;
   bool _register = false;
   bool _codeSent = false;
+
+  /// Password recovery. It is the backend's `mode: 'reset'` flow, not a new
+  /// endpoint: the same email-a-code-then-verify sequence as registration, but
+  /// without name/phone. Kept separate from [_register] so the copy and the
+  /// visible fields can differ while the transport stays identical.
+  bool _reset = false;
   bool _loading = false;
   bool _guestLoading = false;
   String? _challengeId;
@@ -78,6 +84,21 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
       // Lawyer accounts are not created through this door, so drop any
       // half-finished registration state when switching.
       _register = false;
+      _reset = false;
+      _codeSent = false;
+      _challengeId = null;
+      _codeCtrl.clear();
+      _error = null;
+    });
+  }
+
+  /// Switches the client door between sign-in, sign-up and password recovery,
+  /// clearing any in-flight challenge so a code from one flow can never be
+  /// confirmed in another.
+  void _selectMode({bool? register, bool? reset}) {
+    setState(() {
+      _register = register ?? false;
+      _reset = reset ?? false;
       _codeSent = false;
       _challengeId = null;
       _codeCtrl.clear();
@@ -244,6 +265,42 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
     }
   }
 
+  /// Starts password recovery: emails a 6-digit code for an existing account.
+  /// Same transport as registration, with `mode: 'reset'`.
+  Future<void> _requestReset() async {
+    final emailError = _validateEmail(_emailCtrl.text);
+    if (emailError != null) {
+      setState(() => _error = emailError);
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final appState = context.read<AppState>();
+      final (challengeId, _) = await appState.auth.requestAccount(
+        mode: 'reset',
+        email: _emailCtrl.text,
+        // The endpoint requires a password field even for a reset request, so
+        // the new password typed here is what verify() sets on the account.
+        password: _passwordCtrl.text,
+      );
+      if (!mounted) return;
+      setState(() {
+        _challengeId = challengeId;
+        _codeSent = true;
+      });
+      _codeFocus.requestFocus();
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = _friendlyError(e));
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذّر إرسال الرمز، حاول مرة أخرى');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   Future<void> _verifyRegistration() async {
     final codeError = _validateCode(_codeCtrl.text);
     if (codeError != null) {
@@ -274,9 +331,14 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
     }
   }
 
-  Future<void> _submit() => _register
-      ? (_codeSent ? _verifyRegistration() : _requestRegistration())
-      : _signIn();
+  Future<void> _submit() {
+    if (_reset) {
+      return _codeSent ? _verifyRegistration() : _requestReset();
+    }
+    return _register
+        ? (_codeSent ? _verifyRegistration() : _requestRegistration())
+        : _signIn();
+  }
 
   /// Continues into the app without an account. No token, no fake user.
   Future<void> _continueAsGuest() async {
@@ -424,30 +486,30 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: _modeTab('تسجيل الدخول', !_register, () {
-                            setState(() {
-                              _register = false;
-                              _codeSent = false;
-                              _error = null;
-                            });
-                          }),
+                          child: _modeTab('تسجيل الدخول', !_register && !_reset,
+                              () => _selectMode()),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: _modeTab('حساب جديد', _register, () {
-                            setState(() {
-                              _register = true;
-                              _codeSent = false;
-                              _error = null;
-                            });
-                          }),
+                          child: _modeTab('حساب جديد', _register,
+                              () => _selectMode(register: true)),
                         ),
                       ],
                     ),
                   if (!_lawyerMode) const SizedBox(height: 18),
+                  // Recovery reuses the same emailed-code transport and is only
+                  // reachable from the sign-in form.
+                  if (_reset) ...[
+                    _banner(
+                        'استعادة كلمة المرور: أدخل بريدك وكلمة المرور الجديدة، وراح نرسل لك رمز تحقق.',
+                        AppColors.neutralBg,
+                        AppColors.neutralInk,
+                        Icons.lock_reset_outlined),
+                    const SizedBox(height: 16),
+                  ],
                   // The professional door is chosen explicitly, because a lawyer
                   // account and a client account are separate on the platform.
-                  if (!_register)
+                  if (!_register && !_reset)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 16),
                       child: Row(
@@ -505,7 +567,7 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                     ),
                   ],
                   const SizedBox(height: 14),
-                  _label('كلمة المرور'),
+                  _label(_reset ? 'كلمة المرور الجديدة' : 'كلمة المرور'),
                   TextField(
                     controller: _passwordCtrl,
                     enabled: !_codeSent && !busy,
@@ -518,6 +580,21 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                       prefixIcon: Icon(Icons.lock_outline, size: 20),
                     ),
                   ),
+                  // Password recovery lives on the sign-in form only.
+                  if (!_register && !_reset && !_lawyerMode)
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: TextButton(
+                        onPressed: busy ? null : () => _selectMode(reset: true),
+                        style: TextButton.styleFrom(
+                            minimumSize: Size.zero,
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                        child: Text('نسيت كلمة المرور؟',
+                            style: AppTextStyles.tajawal(
+                                size: 12, color: AppColors.brandRed)),
+                      ),
+                    ),
                   if (_register) ...[
                     const SizedBox(height: 14),
                     _label('رقم الهاتف'),
@@ -579,9 +656,15 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                                 color: Colors.white, strokeWidth: 2))
                         : Text(_lawyerMode
                             ? 'دخول لوحة المحامي'
-                            : (_register
-                                ? (_codeSent ? 'تأكيد الرمز وإنشاء الحساب' : 'إرسال رمز التحقق')
-                                : 'تسجيل الدخول')),
+                            : _reset
+                                ? (_codeSent
+                                    ? 'تأكيد الرمز وتعيين كلمة المرور'
+                                    : 'إرسال رمز التحقق')
+                                : (_register
+                                    ? (_codeSent
+                                        ? 'تأكيد الرمز وإنشاء الحساب'
+                                        : 'إرسال رمز التحقق')
+                                    : 'تسجيل الدخول')),
                   ),
                   if (_codeSent)
                     TextButton(
@@ -596,6 +679,7 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                       child: Text('تغيير البيانات',
                           style: AppTextStyles.tajawal(size: 12, color: AppColors.ink2)),
                     ),
+                  if (!_reset) ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -636,6 +720,7 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                     style: AppTextStyles.tajawal(
                         size: 11.5, color: AppColors.ink3, height: 1.6),
                   ),
+                  ],
                 ],
               ),
             ),
