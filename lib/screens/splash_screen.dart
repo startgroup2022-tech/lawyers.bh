@@ -146,8 +146,13 @@ class _SplashScreenState extends State<SplashScreen>
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // A true circle: the disc is square, and the 4:1
+                          // wordmark is scaled to fit inside it rather than
+                          // sizing the disc (which used to make an ellipse).
                           Container(
-                            padding: const EdgeInsets.all(22),
+                            width: 250,
+                            height: 250,
+                            padding: const EdgeInsets.all(30),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               shape: BoxShape.circle,
@@ -159,7 +164,12 @@ class _SplashScreenState extends State<SplashScreen>
                                 ),
                               ],
                             ),
-                            child: const BrandLogo(height: 60),
+                            child: const Center(
+                              child: FittedBox(
+                                fit: BoxFit.contain,
+                                child: BrandLogo(height: 48),
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 22),
                           Text('محامون البحرين',

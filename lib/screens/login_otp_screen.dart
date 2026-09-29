@@ -26,10 +26,27 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
-  final _phoneCtrl = TextEditingController(text: '+973');
+
+  /// The national part of the phone only — the country code is the fixed
+  /// dropdown beside the field, never typed here. That is what stops the code
+  /// from being duplicated (e.g. `+973+973…`) and keeps the stored value a
+  /// single correct E.164 number.
+  final _phoneCtrl = TextEditingController();
   final _licenseCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   final _codeFocus = FocusNode();
+
+  /// Selected calling code. Bahrain is the default; the rest cover the Gulf
+  /// where the platform operates.
+  static const _countryCodes = <({String code, String label})>[
+    (code: '+973', label: 'البحرين ‎+973'),
+    (code: '+966', label: 'السعودية ‎+966'),
+    (code: '+971', label: 'الإمارات ‎+971'),
+    (code: '+974', label: 'قطر ‎+974'),
+    (code: '+965', label: 'الكويت ‎+965'),
+    (code: '+968', label: 'عُمان ‎+968'),
+  ];
+  String _countryCode = '+973';
 
   /// Which sign-in door the form is on. A client signs in with email + password
   /// and can create an account; a lawyer signs in with their licence number +
@@ -84,11 +101,24 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
     return null;
   }
 
-  /// International numbers stored in E.164 (`+` then 8–15 digits).
+  /// Strips spacing and any leading zero so a locally-typed number (`0390…`)
+  /// still becomes one canonical value instead of a double-zero one.
+  String _nationalDigits(String value) {
+    var digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+    while (digits.startsWith('0')) {
+      digits = digits.substring(1);
+    }
+    return digits;
+  }
+
+  /// The number the API receives: exactly one country code followed by the
+  /// national part, in E.164 form (`+` then 8–15 digits).
+  String get _phoneE164 => '$_countryCode${_nationalDigits(_phoneCtrl.text)}';
+
   String? _validatePhone(String? value) {
-    final digits = (value ?? '').replaceAll(RegExp(r'[\s()-]'), '');
-    if (digits.isEmpty) return 'الرجاء إدخال رقم الهاتف';
-    if (!RegExp(r'^\+[1-9][0-9]{7,14}$').hasMatch(digits)) {
+    final national = _nationalDigits(value ?? '');
+    if (national.isEmpty) return 'الرجاء إدخال رقم الهاتف';
+    if (!RegExp(r'^\+[1-9][0-9]{7,14}$').hasMatch('$_countryCode$national')) {
       return 'أدخل رقمًا دوليًا صحيحًا مثل +97339000000';
     }
     return null;
@@ -197,7 +227,7 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
         email: _emailCtrl.text,
         password: _passwordCtrl.text,
         fullName: _nameCtrl.text,
-        phone: _phoneCtrl.text,
+        phone: _phoneE164,
       );
       if (!mounted) return;
       setState(() {
@@ -491,17 +521,28 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                   if (_register) ...[
                     const SizedBox(height: 14),
                     _label('رقم الهاتف'),
-                    TextField(
-                      controller: _phoneCtrl,
-                      enabled: !_codeSent && !busy,
-                      keyboardType: TextInputType.phone,
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => _submit(),
-                      style: AppTextStyles.tajawal(size: 15),
-                      decoration: const InputDecoration(
-                        hintText: '+973XXXXXXXX',
-                        prefixIcon: Icon(Icons.phone_outlined, size: 20),
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Country code lives in its own control; the field
+                        // beside it holds only the national number.
+                        _countryCodePicker(),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _phoneCtrl,
+                            enabled: !_codeSent && !busy,
+                            keyboardType: TextInputType.phone,
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: (_) => _submit(),
+                            style: AppTextStyles.tajawal(size: 15),
+                            decoration: const InputDecoration(
+                              hintText: '3900 0000',
+                              prefixIcon: Icon(Icons.phone_outlined, size: 20),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                   if (_codeSent) ...[
@@ -610,6 +651,41 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
             style: AppTextStyles.tajawal(
                 size: 11.5, weight: FontWeight.w600, color: AppColors.ink2)),
       );
+
+  /// The calling-code control. It only ever emits a single code, so the number
+  /// it is paired with cannot end up carrying the code twice.
+  Widget _countryCodePicker() {
+    final busy = _loading || _guestLoading;
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: AppColors.line),
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _countryCode,
+          isExpanded: false,
+          borderRadius: BorderRadius.circular(AppRadii.sm),
+          style: AppTextStyles.tajawal(size: 14, color: AppColors.ink),
+          onChanged: (!_codeSent && !busy)
+              ? (value) {
+                  if (value != null) setState(() => _countryCode = value);
+                }
+              : null,
+          items: [
+            for (final c in _countryCodes)
+              DropdownMenuItem<String>(
+                value: c.code,
+                child: Text(c.label, style: AppTextStyles.tajawal(size: 13.5)),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _modeTab(String label, bool selected, VoidCallback onTap) {
     return InkWell(

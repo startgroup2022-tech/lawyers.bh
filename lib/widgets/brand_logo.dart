@@ -11,14 +11,22 @@ class BrandLogo extends StatelessWidget {
 
   const BrandLogo({super.key, this.height = 34, this.onDark = false});
 
+  /// The wordmark's own aspect ratio (900x222). Deriving the width from
+  /// [height] means the box is known before the image decodes, so a
+  /// fixed-size parent is not measured against the raw asset's fallback box.
+  static const double _aspectRatio = 900 / 222;
+
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
-      onDark ? 'assets/brand/logo_white.png' : 'assets/brand/logo_color.png',
+    return SizedBox(
       height: height,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-      semanticLabel: 'محامون البحرين',
+      width: height * _aspectRatio,
+      child: Image.asset(
+        onDark ? 'assets/brand/logo_white.png' : 'assets/brand/logo_color.png',
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+        semanticLabel: 'محامون البحرين',
+      ),
     );
   }
 }
@@ -42,7 +50,7 @@ class BrandSeal extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.all(size * 0.16),
         child: Image.asset(
-          'assets/brand/logo_color.png',
+          'assets/images/logo_bh.png',
           fit: BoxFit.contain,
           filterQuality: FilterQuality.high,
           semanticLabel: 'محامون البحرين',

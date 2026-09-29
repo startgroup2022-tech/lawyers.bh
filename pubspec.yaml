@@ -28,3 +28,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/brand/
+    # The square brand seal used in app bars and the sign-in header. Declared
+    # individually so the other, unused artwork in this folder is not bundled.
+    - assets/images/logo_bh.png

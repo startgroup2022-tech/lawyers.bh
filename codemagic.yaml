@@ -36,6 +36,8 @@ workflows:
           if [ ! -d "android" ]; then
             flutter create --platforms=android,ios --org com.superai.lawyersbh --project-name lawyers_bh_client .
           fi
+      - name: Apply Android platform tweaks (INTERNET permission, red launch)
+        script: python3 tool/prepare_android_platform.py
       - name: Remove the flutter create template test
         script: |
           # `flutter create` writes a counter-app widget test that references a
@@ -72,6 +74,11 @@ workflows:
         - lawyers_bh_keystore   # create this signing identity in Codemagic UI first
       groups:
         - lawyers_bh_prod        # holds API_BASE_URL (mark it "secure" in Codemagic)
+      vars:
+        # Fallback used only when the `lawyers_bh_prod` group does not provide
+        # API_BASE_URL, so the release build cannot fail on a missing variable.
+        # A value set in the group still takes precedence and is what ships.
+        API_BASE_URL: "https://www.lawyers.bh"
     scripts:
       - name: Require the production API host
         script: |
@@ -85,6 +92,8 @@ workflows:
           if [ ! -d "android" ]; then
             flutter create --platforms=android,ios --org com.superai.lawyersbh --project-name lawyers_bh_client .
           fi
+      - name: Apply Android platform tweaks (INTERNET permission, red launch)
+        script: python3 tool/prepare_android_platform.py
       - name: Remove the flutter create template test
         script: |
           # `flutter create` writes a counter-app widget test that references a
@@ -124,6 +133,9 @@ workflows:
         bundle_identifier: com.superai.lawyersbh.lawyersBhClient
       groups:
         - lawyers_bh_prod              # holds API_BASE_URL (secure)
+      vars:
+        # Same fallback as android-release; the group value takes precedence.
+        API_BASE_URL: "https://www.lawyers.bh"
     scripts:
       - name: Require the production API host
         script: |
