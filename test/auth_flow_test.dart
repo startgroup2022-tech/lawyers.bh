@@ -1,7 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,6 +13,7 @@ import 'package:lawyers_bh_client/models/user.dart';
 import 'package:lawyers_bh_client/providers/app_state.dart';
 import 'package:lawyers_bh_client/screens/client_shell.dart';
 import 'package:lawyers_bh_client/screens/login_otp_screen.dart';
+import 'package:lawyers_bh_client/screens/lawyer_shell.dart';
 import 'package:lawyers_bh_client/screens/root_shell.dart';
 import 'package:lawyers_bh_client/screens/splash_screen.dart';
 import 'package:lawyers_bh_client/services/api_client.dart';
@@ -187,6 +191,258 @@ void main() {
     });
   });
 
+  group('account kind and door separation', () {
+    http.Response okJson(Map<String, dynamic> body) => http.Response(
+          jsonEncode(body),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+
+    ApiClient failingClient() => ApiClient(
+          httpClient: MockClient((_) async => http.Response(
+                jsonEncode({'ok': false, 'error': 'server_error'}),
+                500,
+                headers: {'content-type': 'application/json'},
+              )),
+        );
+
+    test('a lawyer login marks the account professional and persists the kind',
+        () async {
+      SharedPreferences.setMockInitialValues({});
+      final paths = <String>[];
+      final app = AppState(
+        apiClient: ApiClient(httpClient: MockClient((req) async {
+          paths.add(req.url.path);
+          if (req.url.path == '/api/lawyers/login') {
+            return okJson({
+              'success': true,
+              'data': {'id': 'L1', 'phone': '+97339000002', 'token': 'lawyer-token', 'status': 'approved'},
+            });
+          }
+          if (req.url.path == '/api/mobile/lawyer/session') {
+            return okJson({
+              'ok': true,
+              'lawyer': {
+                'id': 'L1',
+                'nameAr': 'محمد ناجي',
+                'phone': '+97339000002',
+                'status': 'approved',
+                'countryCode': 'BH',
+              },
+            });
+          }
+          return http.Response('{}', 404);
+        })),
+      );
+
+      final (token, user) = await app.lawyerAuth.login(
+        licenseNumber: 'BH-12345',
+        password: 'password123',
+      );
+      expect(token, 'lawyer-token');
+      expect(user.kind, AccountKind.lawyer);
+      expect(user.isProfessional, isTrue, reason: 'the lawyer door is professional');
+      expect(paths, contains('/api/mobile/lawyer/session'),
+          reason: 'the profile is completed from the lawyer session');
+
+      await app.completeLogin(token, user);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('auth_token'), 'lawyer-token');
+      expect(prefs.getString('account_kind'), 'lawyer');
+      expect(app.isProfessional, isTrue);
+    });
+
+    test('a stored lawyer token is restored through the lawyer endpoint', () async {
+      SharedPreferences.setMockInitialValues(
+          {'auth_token': 'lawyer-token', 'account_kind': 'lawyer'});
+      final paths = <String>[];
+      final app = AppState(
+        apiClient: ApiClient(httpClient: MockClient((req) async {
+          paths.add(req.url.path);
+          return okJson({
+            'ok': true,
+            'lawyer': {'id': 'L1', 'nameAr': 'محمد ناجي', 'phone': '+973', 'status': 'approved'},
+          });
+        })),
+      );
+
+      expect(await app.bootstrap(), BootstrapResult.authenticated);
+      expect(paths, contains('/api/mobile/lawyer/session'));
+      expect(paths, isNot(contains('/api/mobile/client-auth/session')),
+          reason: 'a lawyer token is not a client token');
+      expect(app.isProfessional, isTrue);
+    });
+
+    test('a stored client token is restored through the client endpoint', () async {
+      SharedPreferences.setMockInitialValues(
+          {'auth_token': 'client-token', 'account_kind': 'client'});
+      final paths = <String>[];
+      final app = AppState(
+        apiClient: ApiClient(httpClient: MockClient((req) async {
+          paths.add(req.url.path);
+          return okJson({
+            'ok': true,
+            'client': {'id': 'C1', 'email': 'c@example.com', 'fullName': 'عميل', 'phone': '+973'},
+          });
+        })),
+      );
+
+      expect(await app.bootstrap(), BootstrapResult.authenticated);
+      expect(paths, contains('/api/mobile/client-auth/session'));
+      expect(paths, isNot(contains('/api/mobile/lawyer/session')));
+      expect(app.isProfessional, isFalse, reason: 'the client door is not professional');
+    });
+
+    test('a stored lawyer token the backend rejects clears the session', () async {
+      SharedPreferences.setMockInitialValues(
+          {'auth_token': 'revoked', 'account_kind': 'lawyer'});
+      final app = AppState(
+        apiClient: ApiClient(
+          httpClient: MockClient((_) async => http.Response(
+                jsonEncode({'ok': false, 'error': 'unauthorized'}),
+                401,
+                headers: {'content-type': 'application/json'},
+              )),
+        ),
+      );
+
+      expect(await app.bootstrap(), BootstrapResult.sessionExpired);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('auth_token'), isNull);
+      expect(prefs.getString('account_kind'), isNull);
+      expect(app.isProfessional, isFalse);
+    });
+
+    test('logout clears the token, the account kind and the role', () async {
+      SharedPreferences.setMockInitialValues(
+          {'auth_token': 'lawyer-token', 'account_kind': 'lawyer'});
+      final app = AppState(apiClient: failingClient());
+      app.currentUser = AppUser(
+          id: 'L1', phone: '+97339000002', kind: AccountKind.lawyer, role: 'lawyer');
+      expect(app.isProfessional, isTrue);
+
+      await app.logout();
+
+      expect(app.currentUser, isNull);
+      expect(app.isProfessional, isFalse, reason: 'the role must not survive logout');
+      expect(app.isLoggedIn, isFalse);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('auth_token'), isNull);
+      expect(prefs.getString('account_kind'), isNull);
+      expect(prefs.getBool('guest_mode'), isNull);
+    });
+
+    test('switching accounts replaces the previous role completely', () async {
+      SharedPreferences.setMockInitialValues({});
+      final app = AppState(apiClient: failingClient());
+
+      await app.completeLogin('lawyer-token',
+          AppUser(id: 'L1', phone: '+973', kind: AccountKind.lawyer, role: 'lawyer'));
+      expect(app.isProfessional, isTrue);
+
+      await app.logout();
+      await app.completeLogin('client-token',
+          AppUser(id: 'C1', phone: '+973', kind: AccountKind.client, role: 'client'));
+
+      expect(app.currentUser!.kind, AccountKind.client);
+      expect(app.isProfessional, isFalse, reason: 'the lawyer role must be gone');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('account_kind'), 'client');
+      expect(prefs.getString('auth_token'), 'client-token');
+    });
+
+    test('continuing as guest drops a previous session and its role', () async {
+      SharedPreferences.setMockInitialValues(
+          {'auth_token': 'lawyer-token', 'account_kind': 'lawyer'});
+      final app = AppState(apiClient: failingClient());
+      app.currentUser = AppUser(
+          id: 'L1', phone: '+973', kind: AccountKind.lawyer, role: 'lawyer');
+
+      await app.continueAsGuest();
+
+      expect(app.isGuest, isTrue);
+      expect(app.currentUser, isNull);
+      expect(app.isProfessional, isFalse);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('auth_token'), isNull);
+      expect(prefs.getString('account_kind'), isNull);
+      expect(prefs.getBool('guest_mode'), isTrue);
+    });
+
+    testWidgets('the login screen offers a lawyer door that asks for a licence',
+        (tester) async {
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => AppState(apiClient: failingClient()),
+          child: const MaterialApp(home: LoginOtpScreen()),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('محامٍ'), findsOneWidget);
+      expect(find.text('البريد الإلكتروني'), findsOneWidget);
+
+      await tester.tap(find.text('محامٍ'));
+      await tester.pump();
+
+      expect(find.text('رقم الترخيص'), findsOneWidget);
+      expect(find.text('دخول لوحة المحامي'), findsOneWidget);
+      expect(find.text('البريد الإلكتروني'), findsNothing,
+          reason: 'the lawyer door asks for a licence, not an email');
+    });
+
+    testWidgets('a lawyer identity routes to the lawyer workspace', (tester) async {
+      final app = AppState(apiClient: failingClient());
+      app.currentUser = AppUser(
+          id: 'L1', phone: '+97339000002', kind: AccountKind.lawyer, role: 'lawyer');
+
+      await tester.pumpWidget(ChangeNotifierProvider<AppState>.value(
+        value: app,
+        child: const MaterialApp(home: RootShell()),
+      ));
+      await tester.pump();
+
+      expect(find.byType(LawyerShell), findsOneWidget);
+      expect(find.byType(ClientShell), findsNothing);
+    });
+
+    testWidgets('a client identity routes to the client workspace', (tester) async {
+      final app = AppState(apiClient: failingClient());
+      app.currentUser = AppUser(
+          id: 'C1', phone: '+97339000001', kind: AccountKind.client, role: 'client');
+
+      await tester.pumpWidget(ChangeNotifierProvider<AppState>.value(
+        value: app,
+        child: const MaterialApp(home: RootShell()),
+      ));
+      await tester.pump();
+
+      expect(find.byType(ClientShell), findsOneWidget);
+      expect(find.byType(LawyerShell), findsNothing);
+    });
+
+    testWidgets('logging out leaves the workspace and lands on login',
+        (tester) async {
+      final app = AppState(apiClient: failingClient());
+      app.currentUser = AppUser(
+          id: 'L1', phone: '+97339000002', kind: AccountKind.lawyer, role: 'lawyer');
+
+      await tester.pumpWidget(ChangeNotifierProvider<AppState>.value(
+        value: app,
+        child: const MaterialApp(home: RootShell()),
+      ));
+      await tester.pump();
+      expect(find.byType(LawyerShell), findsOneWidget);
+
+      await app.logout();
+      await tester.pump();
+
+      expect(find.byType(LawyerShell), findsNothing,
+          reason: 'the lawyer workspace must not outlive the session');
+      expect(find.byType(LoginOtpScreen), findsOneWidget);
+    });
+  });
+
   group('canonical API usage', () {
     final dartFiles = Directory('lib')
         .listSync(recursive: true)
@@ -202,14 +458,19 @@ void main() {
       expect(offenders, isEmpty, reason: 'the app must only speak to the canonical API');
     });
 
-    test('every API path targets the real platform surface (/api/mobile)', () {
+    test('every API path targets a real platform surface', () {
       final pattern = RegExp(r"""['"]/api/[^'"]*""");
+      // The platform exposes the mobile API under /api/mobile, plus the lawyer
+      // sign-in at /api/lawyers/login. Anything else is a web-portal route or a
+      // route that does not exist.
+      const allowedExact = {'/api/lawyers/login'};
       for (final file in dartFiles) {
         for (final match in pattern.allMatches(file.readAsStringSync())) {
-          // The platform's client + lawyer API lives under /api/mobile. Anything
-          // else is either a web-portal route or a route that does not exist.
-          expect(match.group(0), startsWith("'/api/mobile"),
-              reason: 'unexpected endpoint in ${file.path}: ${match.group(0)}');
+          // The match includes the opening quote.
+          final path = match.group(0)!.replaceFirst(RegExp(r"""^['"]"""), '');
+          final ok = path.startsWith('/api/mobile') || allowedExact.contains(path);
+          expect(ok, isTrue,
+              reason: 'unexpected endpoint in ${file.path}: $path');
         }
       }
     });

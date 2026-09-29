@@ -6,6 +6,7 @@ import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/case_service.dart';
 import '../services/documents_service.dart';
+import '../services/lawyer_auth_service.dart';
 import '../services/lawyer_service.dart';
 import '../services/lawyers_service.dart';
 import '../services/leads_service.dart';
@@ -16,6 +17,12 @@ import '../services/sos_service.dart';
 
 const _tokenPrefsKey = 'auth_token';
 const _guestPrefsKey = 'guest_mode';
+
+/// Which door the stored token came through, so a restart restores the session
+/// against the right endpoint. A client token is validated by
+/// `/api/mobile/client-auth/session`; a lawyer token by
+/// `/api/mobile/lawyer/session`. The tokens are not interchangeable.
+const _accountKindPrefsKey = 'account_kind';
 
 /// How the app started. Drives which experience the splash hands off to.
 enum BootstrapResult {
@@ -44,6 +51,7 @@ class AppState extends ChangeNotifier {
 
   final ApiClient api;
   late final AuthService auth = AuthService(api);
+  late final LawyerAuthService lawyerAuth = LawyerAuthService(api);
   late final LawyersService lawyers = LawyersService(api);
   late final CaseService cases = CaseService(api);
   late final SosService sos = SosService(api);
@@ -81,9 +89,14 @@ class AppState extends ChangeNotifier {
     var result = BootstrapResult.firstRun;
 
     if (token != null && token.isNotEmpty) {
+      // Restore against the door the token came through. A client token only
+      // validates on the client session route and a lawyer token only on the
+      // lawyer one, so reading the kind is what keeps a restart from silently
+      // demoting a lawyer to a client.
+      final kind = _kindFromPrefs(prefs.getString(_accountKindPrefsKey));
       api.setToken(token);
       try {
-        currentUser = await (identityLoader ?? auth.session)();
+        currentUser = await (identityLoader ?? () => _loadIdentity(kind))();
         isGuest = false;
         await prefs.remove(_guestPrefsKey);
         result = BootstrapResult.authenticated;
@@ -92,10 +105,7 @@ class AppState extends ChangeNotifier {
         // or server-side failure must not; treat it as a temporary outage and
         // keep the stored token so a retry can restore the session.
         if (_isAuthRejection(e)) {
-          await prefs.remove(_tokenPrefsKey);
-          api.setToken(null);
-          currentUser = null;
-          isGuest = false;
+          await _clearSession(prefs);
           result = BootstrapResult.sessionExpired;
         } else {
           currentUser = null;
@@ -119,14 +129,33 @@ class AppState extends ChangeNotifier {
     return result;
   }
 
+  Future<AppUser> _loadIdentity(AccountKind kind) =>
+      kind == AccountKind.lawyer ? lawyerAuth.session() : auth.session();
+
+  static AccountKind _kindFromPrefs(String? value) =>
+      value == AccountKind.lawyer.name ? AccountKind.lawyer : AccountKind.client;
+
+  /// Drops every trace of the current session: token, account kind and guest
+  /// flag. Used on logout, on a rejected session, and before switching accounts,
+  /// so no role or identity can survive into the next sign-in.
+  Future<void> _clearSession(SharedPreferences prefs) async {
+    await prefs.remove(_tokenPrefsKey);
+    await prefs.remove(_accountKindPrefsKey);
+    await prefs.remove(_guestPrefsKey);
+    api.setToken(null);
+    currentUser = null;
+    isGuest = false;
+  }
+
   Future<void> completeLogin(String token, AppUser user) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenPrefsKey, token);
+    await prefs.setString(_accountKindPrefsKey, user.kind.name);
     api.setToken(token);
     isGuest = false;
     sessionExpired = false;
 
-    // The verify response already carries the full client profile, so no
+    // The login/session response already carries the full profile, so no
     // follow-up identity call is needed; keep it simple and use it directly.
     currentUser = user;
     notifyListeners();
@@ -138,28 +167,30 @@ class AppState extends ChangeNotifier {
   /// but it is never a credential — `isLoggedIn` stays false throughout.
   Future<void> continueAsGuest() async {
     final prefs = await SharedPreferences.getInstance();
+    // Drop any previous session first: switching to guest must not leave a
+    // token or a role behind for the next sign-in to inherit.
+    await _clearSession(prefs);
     await prefs.setBool(_guestPrefsKey, true);
     isGuest = true;
     sessionExpired = false;
-    currentUser = null;
-    api.setToken(null);
     notifyListeners();
   }
 
   Future<void> logout() async {
-    // Best-effort server-side session teardown before clearing locally. A
+    // Best-effort server-side teardown before clearing locally, against the
+    // door the session came through: a client session is revoked with
+    // DELETE /api/mobile/client-auth/session; a lawyer token is stateless and
+    // has no logout route, so clearing it locally is the whole operation. A
     // failed call must not leave the user stuck signed in.
-    try {
-      await auth.logout();
-    } catch (_) {
-      // Ignore: clearing local state below is what matters.
+    if (currentUser?.kind != AccountKind.lawyer) {
+      try {
+        await auth.logout();
+      } catch (_) {
+        // Ignore: clearing local state below is what matters.
+      }
     }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_tokenPrefsKey);
-    await prefs.remove(_guestPrefsKey);
-    api.setToken(null);
-    currentUser = null;
-    isGuest = false;
+    await _clearSession(prefs);
     sessionExpired = false;
     notifyListeners();
   }
@@ -173,13 +204,19 @@ class AppState extends ChangeNotifier {
 
   void _handleAuthRejection() {
     // Only a signed-in session can expire; ignore rejections while logged out
-    // (e.g. a wrong OTP code, which the login screen reports itself).
+    // (e.g. a wrong code, which the login screen reports itself).
     if (currentUser == null) return;
+    // Clear the in-memory session synchronously so no screen can keep using a
+    // token the backend has already rejected; the stored copy follows.
     sessionExpired = true;
+    api.setToken(null);
     currentUser = null;
     isGuest = false;
-    api.setToken(null);
-    SharedPreferences.getInstance().then((p) => p.remove(_tokenPrefsKey));
+    SharedPreferences.getInstance().then((prefs) async {
+      await prefs.remove(_tokenPrefsKey);
+      await prefs.remove(_accountKindPrefsKey);
+      await prefs.remove(_guestPrefsKey);
+    });
     notifyListeners();
   }
 

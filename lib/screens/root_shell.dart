@@ -24,12 +24,15 @@ class RootShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final expired = context.select<AppState, bool>((s) => s.sessionExpired);
-    if (expired) {
-      // Stay on login until a real sign-in clears the flag (see
-      // AppState.completeLogin). Returning a workspace here would bounce the
-      // user straight back into screens that can only fail.
-      return const LoginOtpScreen(
-        notice: 'انتهت صلاحية الجلسة، الرجاء تسجيل الدخول من جديد.',
+    final loggedIn = context.select<AppState, bool>((s) => s.isLoggedIn);
+    if (expired || !loggedIn) {
+      // Stay on login until a real sign-in restores the session (see
+      // AppState.completeLogin). This is also what makes logout and an
+      // account switch land on the login screen: once the session is cleared
+      // there is no identity left to build a workspace from, so returning one
+      // would show the previous role's screens with no account behind them.
+      return LoginOtpScreen(
+        notice: expired ? 'انتهت صلاحية الجلسة، الرجاء تسجيل الدخول من جديد.' : null,
       );
     }
 

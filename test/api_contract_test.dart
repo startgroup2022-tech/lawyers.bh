@@ -103,6 +103,50 @@ void main() {
     }, skip: skipReason);
   });
 
+  group('lawyer auth contract (the professional door)', () {
+    test('an unknown licence is rejected with 401, not a token', () async {
+      final app = AppState();
+      final e = await expectApiError(() => app.lawyerAuth.login(
+            licenseNumber: 'NOT-A-REAL-LICENCE',
+            password: 'password123',
+          ));
+      expect(e.statusCode, 401);
+      expect(app.isProfessional, isFalse);
+      expect(app.isLoggedIn, isFalse);
+    }, skip: skipReason);
+
+    test('a rejected lawyer login leaves no token behind', () async {
+      final app = AppState();
+      await expectApiError(() => app.lawyerAuth.login(
+            licenseNumber: 'NOT-A-REAL-LICENCE',
+            password: 'password123',
+          ));
+      // The service sets the token to read the session; a failure must clear it.
+      await expectApiError(() => app.lawyerAuth.session());
+    }, skip: skipReason);
+
+    test('the lawyer session rejects a missing token (401)', () async {
+      final app = AppState();
+      final e = await expectApiError(() => app.lawyerAuth.session());
+      expect(e.statusCode, 401);
+    }, skip: skipReason);
+
+    test('a client token cannot open the lawyer session', () async {
+      final app = AppState();
+      app.api.setToken('not-a-real-token');
+      final e = await expectApiError(() => app.lawyerAuth.session());
+      expect(e.statusCode, 401, reason: 'the two doors are not interchangeable');
+    }, skip: skipReason);
+
+    test('a licence-shaped credential cannot sign in through the client door',
+        () async {
+      final app = AppState();
+      final e = await expectApiError(
+          () => app.auth.login('NOT-A-REAL-LICENCE', 'password123'));
+      expect(e.error, 'invalid_credentials');
+    }, skip: skipReason);
+  });
+
   group('feature gaps are explicit, not silent empty lists', () {
     test('client messaging reports feature_not_available', () async {
       final app = AppState();

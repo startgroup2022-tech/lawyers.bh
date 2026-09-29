@@ -27,8 +27,15 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
   final _passwordCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController(text: '+973');
+  final _licenseCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   final _codeFocus = FocusNode();
+
+  /// Which sign-in door the form is on. A client signs in with email + password
+  /// and can create an account; a lawyer signs in with their licence number +
+  /// password. The platform keeps the two as separate accounts, so the choice is
+  /// explicit rather than guessed from the credentials.
+  bool _lawyerMode = false;
   bool _register = false;
   bool _codeSent = false;
   bool _loading = false;
@@ -42,9 +49,23 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
     _passwordCtrl.dispose();
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
+    _licenseCtrl.dispose();
     _codeCtrl.dispose();
     _codeFocus.dispose();
     super.dispose();
+  }
+
+  void _selectDoor({required bool lawyer}) {
+    setState(() {
+      _lawyerMode = lawyer;
+      // Lawyer accounts are not created through this door, so drop any
+      // half-finished registration state when switching.
+      _register = false;
+      _codeSent = false;
+      _challengeId = null;
+      _codeCtrl.clear();
+      _error = null;
+    });
   }
 
   String? _validateEmail(String? value) {
@@ -85,7 +106,14 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
     return null;
   }
 
+  String? _validateLicense(String? value) {
+    if ((value ?? '').trim().isEmpty) return 'الرجاء إدخال رقم الترخيص';
+    return null;
+  }
+
   Future<void> _signIn() async {
+    if (_lawyerMode) return _signInAsLawyer();
+
     final emailError = _validateEmail(_emailCtrl.text);
     final passwordError = _validatePassword(_passwordCtrl.text);
     if (emailError != null || passwordError != null) {
@@ -105,7 +133,41 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
       Navigator.of(context)
           .pushReplacement(MaterialPageRoute(builder: (_) => const RootShell()));
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = _friendlyError(e.error));
+      if (mounted) setState(() => _error = _friendlyError(e));
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذّر تسجيل الدخول، حاول مرة أخرى');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// The professional door: licence number + password against
+  /// `POST /api/lawyers/login`. A client account cannot sign in here, and a
+  /// lawyer account cannot sign in through the client door — the platform keeps
+  /// them as separate accounts.
+  Future<void> _signInAsLawyer() async {
+    final licenseError = _validateLicense(_licenseCtrl.text);
+    final passwordError = _validatePassword(_passwordCtrl.text);
+    if (licenseError != null || passwordError != null) {
+      setState(() => _error = licenseError ?? passwordError);
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final appState = context.read<AppState>();
+      final (token, user) = await appState.lawyerAuth.login(
+        licenseNumber: _licenseCtrl.text,
+        password: _passwordCtrl.text,
+      );
+      await appState.completeLogin(token, user);
+      if (!mounted) return;
+      Navigator.of(context)
+          .pushReplacement(MaterialPageRoute(builder: (_) => const RootShell()));
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = _friendlyError(e));
     } catch (_) {
       if (mounted) setState(() => _error = 'تعذّر تسجيل الدخول، حاول مرة أخرى');
     } finally {
@@ -144,7 +206,7 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
       });
       _codeFocus.requestFocus();
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = _friendlyError(e.error));
+      if (mounted) setState(() => _error = _friendlyError(e));
     } catch (_) {
       if (mounted) setState(() => _error = 'تعذّر إرسال الرمز، حاول مرة أخرى');
     } finally {
@@ -174,7 +236,7 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
       Navigator.of(context)
           .pushReplacement(MaterialPageRoute(builder: (_) => const RootShell()));
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = _friendlyError(e.error));
+      if (mounted) setState(() => _error = _friendlyError(e));
     } catch (_) {
       if (mounted) setState(() => _error = 'تعذّر التحقق من الرمز، حاول مرة أخرى');
     } finally {
@@ -199,8 +261,13 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
     }
   }
 
-  String _friendlyError(String code) {
-    switch (code) {
+  /// Maps a backend failure to an Arabic message.
+  ///
+  /// The client door answers with a stable error *code*; the lawyer door
+  /// (`/api/lawyers/login`) answers with a `message` and a status, so a code we
+  /// do not recognise falls back to the status rather than a generic string.
+  String _friendlyError(ApiException e) {
+    switch (e.error) {
       case 'invalid_credentials':
         return 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
       case 'invalid_email':
@@ -217,15 +284,21 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
         return 'يوجد حساب بهذا البريد بالفعل، سجّل الدخول';
       case 'account_required':
         return 'أكمل بيانات الحساب أولًا';
+      case 'account_unavailable':
+      case 'ACCOUNT_UNAVAILABLE':
+        return 'الحساب غير متاح، تواصل مع الدعم';
       case 'rate_limited':
         return 'محاولات كثيرة، حاول بعد قليل';
       case 'network_error':
         return 'تعذّر الاتصال بالخادم، تحقق من اتصالك بالإنترنت';
       case 'network_timeout':
         return 'انتهت مهلة الاتصال بالخادم، حاول مرة أخرى';
-      default:
-        return 'حدث خطأ، حاول مرة أخرى';
     }
+    // Lawyer login answers with a message and a status, not a code.
+    if (e.statusCode == 401) return 'بيانات الدخول غير صحيحة';
+    if (e.statusCode == 403) return 'الحساب غير متاح، تواصل مع الدعم';
+    if (e.statusCode == 400) return 'تحقّق من البيانات المدخلة وحاول مرة أخرى';
+    return 'حدث خطأ، حاول مرة أخرى';
   }
 
   Future<void> _sosBeforeLogin() async {
@@ -317,30 +390,50 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                         Icons.info_outline),
                     const SizedBox(height: 16),
                   ],
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _modeTab('تسجيل الدخول', !_register, () {
-                          setState(() {
-                            _register = false;
-                            _codeSent = false;
-                            _error = null;
-                          });
-                        }),
+                  if (!_lawyerMode)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _modeTab('تسجيل الدخول', !_register, () {
+                            setState(() {
+                              _register = false;
+                              _codeSent = false;
+                              _error = null;
+                            });
+                          }),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _modeTab('حساب جديد', _register, () {
+                            setState(() {
+                              _register = true;
+                              _codeSent = false;
+                              _error = null;
+                            });
+                          }),
+                        ),
+                      ],
+                    ),
+                  if (!_lawyerMode) const SizedBox(height: 18),
+                  // The professional door is chosen explicitly, because a lawyer
+                  // account and a client account are separate on the platform.
+                  if (!_register)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _modeTab('عميل', !_lawyerMode,
+                                () => _selectDoor(lawyer: false)),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _modeTab('محامٍ', _lawyerMode,
+                                () => _selectDoor(lawyer: true)),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _modeTab('حساب جديد', _register, () {
-                          setState(() {
-                            _register = true;
-                            _codeSent = false;
-                            _error = null;
-                          });
-                        }),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
+                    ),
                   if (_register) ...[
                     _label('الاسم الكامل'),
                     TextField(
@@ -355,18 +448,32 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                     ),
                     const SizedBox(height: 14),
                   ],
-                  _label('البريد الإلكتروني'),
-                  TextField(
-                    controller: _emailCtrl,
-                    enabled: !_codeSent && !busy,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    style: AppTextStyles.tajawal(size: 15),
-                    decoration: const InputDecoration(
-                      hintText: 'name@example.com',
-                      prefixIcon: Icon(Icons.mail_outline, size: 20),
+                  if (_lawyerMode) ...[
+                    _label('رقم الترخيص'),
+                    TextField(
+                      controller: _licenseCtrl,
+                      enabled: !busy,
+                      textInputAction: TextInputAction.next,
+                      style: AppTextStyles.tajawal(size: 15),
+                      decoration: const InputDecoration(
+                        hintText: 'رقم القيد في نقابة المحامين',
+                        prefixIcon: Icon(Icons.badge_outlined, size: 20),
+                      ),
                     ),
-                  ),
+                  ] else ...[
+                    _label('البريد الإلكتروني'),
+                    TextField(
+                      controller: _emailCtrl,
+                      enabled: !_codeSent && !busy,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      style: AppTextStyles.tajawal(size: 15),
+                      decoration: const InputDecoration(
+                        hintText: 'name@example.com',
+                        prefixIcon: Icon(Icons.mail_outline, size: 20),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   _label('كلمة المرور'),
                   TextField(
@@ -429,9 +536,11 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                             width: 18,
                             child: CircularProgressIndicator(
                                 color: Colors.white, strokeWidth: 2))
-                        : Text(_register
-                            ? (_codeSent ? 'تأكيد الرمز وإنشاء الحساب' : 'إرسال رمز التحقق')
-                            : 'تسجيل الدخول'),
+                        : Text(_lawyerMode
+                            ? 'دخول لوحة المحامي'
+                            : (_register
+                                ? (_codeSent ? 'تأكيد الرمز وإنشاء الحساب' : 'إرسال رمز التحقق')
+                                : 'تسجيل الدخول')),
                   ),
                   if (_codeSent)
                     TextButton(

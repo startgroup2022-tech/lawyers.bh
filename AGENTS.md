@@ -68,6 +68,41 @@ wrong password** — deliberate anti-enumeration. Field-level codes
 (`invalid_email`, `invalid_password`, `invalid_name`, `invalid_phone`) come from
 `/request`. Do not "fix" login to expect `invalid_email`.
 
+### Who is a lawyer: the door, not a role claim
+
+Clients and lawyers are **two disjoint account systems** in the one database:
+
+| | Client | Lawyer |
+| --- | --- | --- |
+| Table | `mobile_client_accounts` | `bahrain_lawyers` |
+| Sign-in | email + password | licence number + password |
+| Route | `/api/mobile/client-auth/login` | `/api/lawyers/login` |
+| Token | opaque, stored in `mobile_client_sessions` | signed `{lawyerId, countryCode, exp}`, 30-day TTL |
+| Validated by | `GET /api/mobile/client-auth/session` | `GET /api/mobile/lawyer/session` |
+
+Neither session carries a `role` field, and the tokens are **not
+interchangeable** — a client token is rejected by the lawyer session route and
+vice versa. So the app must **not** guess the account kind from a role claim:
+
+- `AppUser.kind` (`AccountKind.client|lawyer`) records which door the session
+  came through, set by the sign-in method that produced it.
+- `AppUser.isProfessional` is driven by `kind`, so a lawyer session always opens
+  `LawyerShell` and a client session always opens `ClientShell`.
+- `account_kind` is persisted next to the token, so a restart restores the
+  session through the **matching** endpoint instead of demoting a lawyer.
+- `AppState.logout()` revokes a client session server-side
+  (`DELETE /api/mobile/client-auth/session`); a lawyer token is stateless with no
+  logout route, so clearing it locally is the whole operation.
+- Every path that ends a session — logout, a rejected token, switching to guest —
+  clears the token, `account_kind`, the guest flag and the in-memory user, so no
+  role can survive into the next sign-in. `RootShell` shows the login screen
+  whenever there is no signed-in user, which is what makes logout land on login
+  instead of leaving a shell with no account behind it.
+
+Lawyer login answers with `{success, message}` and a **status** (401 invalid
+details, 403 unavailable), not an error code; the client door answers with
+`{ok, error:<code>}`. `_friendlyError` handles both.
+
 ### Directory
 
 - `GET /api/mobile/lawyers?countryCode=BH` → `{ok, countryCode, data:[{id (UUID),
