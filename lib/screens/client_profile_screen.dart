@@ -36,7 +36,7 @@ class ClientProfileScreen extends StatelessWidget {
                           size: 17, weight: FontWeight.w800)),
                   const SizedBox(height: 10),
                   Text(
-                    'سجّل دخولك برقم هاتفك خلال ثوانٍ للوصول إلى العقود، متابعة القضايا، الرسائل، والنجدة القانونية العاجلة.',
+                    'سجّل دخولك ببريدك الإلكتروني خلال ثوانٍ للوصول إلى العقود، متابعة القضايا، الرسائل، والنجدة القانونية العاجلة.',
                     textAlign: TextAlign.center,
                     style: AppTextStyles.tajawal(
                         size: 13, color: AppColors.ink2, height: 1.8),
