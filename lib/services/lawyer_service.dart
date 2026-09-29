@@ -1,14 +1,14 @@
 import '../models/lawyer_profile.dart';
 import 'api_client.dart';
 
-/// The professional (lawyer) endpoints the mobile API actually exposes.
+/// The professional (lawyer) endpoints the mobile API exposes.
 ///
 /// A lawyer signs in with their licence number and password
 /// (`POST /api/lawyers/login`), which returns a mobile lawyer session token.
-/// That token unlocks the lawyer's own session, earnings and withdrawals —
-/// **not** a general profile editor, availability grid, lead pipeline or
-/// document vault, which live in the lawyer web portal. Those are reported as
-/// unavailable rather than silently faked.
+/// That token unlocks the lawyer's own session, earnings, withdrawals, profile
+/// editor, weekly availability grid and blocked dates. The lead pipeline and
+/// document vault remain web-portal surfaces and are reported as unavailable
+/// rather than silently faked.
 class LawyerService {
   final ApiClient api;
   LawyerService(this.api);
@@ -31,33 +31,71 @@ class LawyerService {
   /// Withdrawal history (`GET /api/mobile/lawyer/withdrawals`).
   Future<Map<String, dynamic>> withdrawals() => api.get('/api/mobile/lawyer/withdrawals');
 
-  // ---- Web-portal only: no mobile endpoint -------------------------------
+  /// The lawyer's own profile, including the weekly availability grid
+  /// (`GET /api/mobile/lawyer/profile`).
+  Future<LawyerProfile> profile() async {
+    final data = await api.get('/api/mobile/lawyer/profile');
+    final profile = data['profile'];
+    if (profile is Map<String, dynamic>) return LawyerProfile.fromJson(profile);
+    throw const ApiException('invalid_server_response', 200);
+  }
 
-  Future<LawyerProfile> profile() async => throw _unavailable();
+  /// Saves the profile editor (`PATCH /api/mobile/lawyer/profile`). The payload
+  /// is sent as the editor builds it; unknown keys are ignored server-side.
+  Future<LawyerProfile> updateProfile(Map<String, dynamic> payload) async {
+    final data = await api.patch('/api/mobile/lawyer/profile', payload);
+    final profile = data['profile'];
+    if (profile is Map<String, dynamic>) return LawyerProfile.fromJson(profile);
+    throw const ApiException('invalid_server_response', 200);
+  }
 
-  Future<void> updateProfile(Map<String, dynamic> payload) async => throw _unavailable();
+  /// Replaces the whole weekly grid (`PUT /api/mobile/lawyer/availability`).
+  Future<void> syncAvailability(List<Map<String, dynamic>> slots) async {
+    await api.put('/api/mobile/lawyer/availability', {'availability': slots});
+  }
 
-  Future<void> syncAvailability(List<Map<String, dynamic>> slots) async =>
-      throw _unavailable();
+  /// The lawyer's blocked dates (`GET /api/mobile/lawyer/blocked-dates`).
+  Future<List<BlockedDate>> blockedDates({String? from, String? to}) async {
+    final data = await api.get('/api/mobile/lawyer/blocked-dates');
+    final rows = data['blockedDates'];
+    if (rows is! List) return const [];
+    return rows
+        .whereType<Map<String, dynamic>>()
+        .map(BlockedDate.fromJson)
+        .toList(growable: false);
+  }
 
-  Future<void> syncSpecializations(List<int> ids) async => throw _unavailable();
-
-  Future<void> syncServices(List<int> ids) async => throw _unavailable();
-
-  Future<List<BlockedDate>> blockedDates({String? from, String? to}) async =>
-      throw _unavailable();
-
-  Future<int> blockDate({
+  /// Blocks a date or a time range inside it
+  /// (`POST /api/mobile/lawyer/blocked-dates`). Returns the new id.
+  Future<String> blockDate({
     required String date,
     bool allDay = true,
     String? startTime,
     String? endTime,
     String reasonType = 'other',
     String? reason,
-  }) async =>
-      throw _unavailable();
+  }) async {
+    final data = await api.post('/api/mobile/lawyer/blocked-dates', {
+      'date': date,
+      'allDay': allDay,
+      if (!allDay) 'startTime': startTime,
+      if (!allDay) 'endTime': endTime,
+      'reasonType': reasonType,
+      if (reason != null && reason.isNotEmpty) 'reason': reason,
+    });
+    return '${data['id']}';
+  }
 
-  Future<void> unblockDate(int id) async => throw _unavailable();
+  /// Removes one of the lawyer's own blocked dates.
+  Future<void> unblockDate(String id) async {
+    await api.delete('/api/mobile/lawyer/blocked-dates?id=$id');
+  }
+
+  // ---- Web-portal only: no mobile endpoint -------------------------------
+
+  Future<void> syncSpecializations(List<int> ids) async => throw _unavailable();
+
+  Future<void> syncServices(List<int> ids) async => throw _unavailable();
 
   Future<List<(int, String)>> specializations() async => throw _unavailable();
 

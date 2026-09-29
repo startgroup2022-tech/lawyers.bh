@@ -128,7 +128,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
     }
   }
 
-  Future<void> _unblock(int id) async {
+  Future<void> _unblock(String id) async {
     try {
       await context.read<AppState>().lawyer.unblockDate(id);
       await _load();

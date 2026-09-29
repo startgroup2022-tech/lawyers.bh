@@ -4,7 +4,7 @@
 /// services, weekly availability and verification trail. Only the fields the
 /// workspace actually shows are modelled; anything else stays on the server.
 class LawyerProfile {
-  final int id;
+  final String id;
   final String professionalName;
   final String? professionalNameEn;
   final int experienceYears;
@@ -66,7 +66,7 @@ class LawyerProfile {
   bool get isPublished => profileStatus == 'published';
 
   factory LawyerProfile.fromJson(Map<String, dynamic> json) => LawyerProfile(
-        id: int.parse(json['id'].toString()),
+        id: '${json['id']}',
         professionalName: json['professional_name'] ?? '',
         professionalNameEn: json['professional_name_en'],
         experienceYears: int.tryParse('${json['experience_years']}') ?? 0,
@@ -124,7 +124,7 @@ class LawyerProfile {
 }
 
 class LawyerSpecialization {
-  final int id;
+  final String id;
   final String nameAr;
   final bool isPrimary;
   final int yearsExperience;
@@ -141,7 +141,7 @@ class LawyerSpecialization {
         // id and `specialization_id` is the real specialization. Prefer the
         // latter so the value can be sent back to the sync endpoints; fall back
         // to `id` for directory payloads where the two coincide.
-        id: int.parse('${json['specialization_id'] ?? json['id']}'),
+        id: '${json['specialization_id'] ?? json['id']}',
         nameAr: json['name_ar'] ?? '',
         isPrimary: json['is_primary'] == true || json['is_primary'] == 1,
         yearsExperience: int.tryParse('${json['years_experience']}') ?? 0,
@@ -231,7 +231,7 @@ class VerificationEvent {
 }
 
 class BlockedDate {
-  final int id;
+  final String id;
   final String blockedDate;
   final bool allDay;
   final String? startTime;
@@ -250,7 +250,7 @@ class BlockedDate {
   });
 
   factory BlockedDate.fromJson(Map<String, dynamic> json) => BlockedDate(
-        id: int.parse(json['id'].toString()),
+        id: '${json['id']}',
         blockedDate: '${json['blocked_date']}',
         allDay: json['all_day'] == true || json['all_day'] == 1,
         startTime: json['start_time'],
