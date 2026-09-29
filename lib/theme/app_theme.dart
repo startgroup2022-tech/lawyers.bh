@@ -107,7 +107,11 @@ class AppShadows {
 ThemeData buildAppTheme({Color? backgroundColor}) {
   final base = ThemeData.light();
   return base.copyWith(
-    scaffoldBackgroundColor: backgroundColor ?? AppColors.bg,
+    // Transparent so the single global background layer (see
+    // AppBackgroundScope) shows through every screen. Screens that painted an
+    // opaque scaffold colour are switched to transparent as well, so the app
+    // reads as content-on-background rather than content-on-a-white-sheet.
+    scaffoldBackgroundColor: Colors.transparent,
     colorScheme: base.colorScheme.copyWith(
       primary: AppColors.brandRed,
       secondary: AppColors.crimson,

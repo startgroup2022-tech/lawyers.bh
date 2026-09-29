@@ -153,7 +153,8 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: LawyerColors.canvas,
+      // Transparent so the global app background shows through.
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: LawyerColors.base,
         title: const Text('ملف العميل المحتمل'),

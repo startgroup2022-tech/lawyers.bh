@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
-import '../widgets/app_background.dart';
 import '../widgets/brand_logo.dart';
 import 'lawyer_cases_screen.dart';
 import 'lawyer_dashboard_screen.dart';
@@ -70,10 +69,10 @@ class _LawyerShellState extends State<LawyerShell> {
           ),
         ],
       ),
-      body: AppBackgroundScope(
-        fallbackColor: LawyerColors.canvas,
-        child: IndexedStack(index: _index, children: _tabs),
-      ),
+      // The background is painted once, globally, behind the whole app (see
+      // main.dart). This screen only supplies content, so the image is not
+      // repainted — and not covered — here.
+      body: IndexedStack(index: _index, children: _tabs),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),

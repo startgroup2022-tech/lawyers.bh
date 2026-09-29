@@ -20,12 +20,15 @@ class AppearanceService {
   Future<AppAppearance> load({String countryCode = 'BH'}) async {
     try {
       final data = await api.get('/api/mobile/appearance', query: {'countryCode': countryCode});
-      final appearance = AppAppearance.fromJson(_record(data));
+      // Fill in the bundled image when the backend configured none, so the
+      // global background is visible even before an admin uploads one.
+      final appearance =
+          AppAppearance.fromJson(_record(data)).withVisibleBackground();
       await _cache(appearance);
       return appearance;
     } on ApiException {
       // A background is decoration; an outage must never block the app. Fall
-      // back to the last known value, or the default.
+      // back to the last known value, or the bundled default.
       return _cached();
     }
   }
@@ -46,13 +49,15 @@ class AppearanceService {
   Future<AppAppearance> _cached() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_cacheKey);
-    if (raw == null || raw.isEmpty) return AppAppearance.defaults;
+    if (raw == null || raw.isEmpty) return AppAppearance.demoBackground;
     try {
       final decoded = jsonDecode(raw);
-      if (decoded is Map<String, dynamic>) return AppAppearance.fromJson(decoded);
+      if (decoded is Map<String, dynamic>) {
+        return AppAppearance.fromJson(decoded).withVisibleBackground();
+      }
     } catch (_) {
-      // Corrupt cache: fall through to the default rather than crashing.
+      // Corrupt cache: fall through to the bundled default rather than crashing.
     }
-    return AppAppearance.defaults;
+    return AppAppearance.demoBackground;
   }
 }

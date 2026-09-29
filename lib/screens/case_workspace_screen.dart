@@ -59,7 +59,8 @@ class _CaseWorkspaceScreenState extends State<CaseWorkspaceScreen> {
     return DefaultTabController(
       length: 5,
       child: Scaffold(
-        backgroundColor: LawyerColors.canvas,
+        // Transparent so the global app background shows through.
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
           backgroundColor: LawyerColors.base,
           title: Text(_case?.title ?? 'ملف القضية', overflow: TextOverflow.ellipsis),

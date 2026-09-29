@@ -66,7 +66,8 @@ class LawyerProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      // Transparent so the global app background shows through this screen.
+      backgroundColor: Colors.transparent,
       body: CustomScrollView(
         slivers: [
           _header(context),

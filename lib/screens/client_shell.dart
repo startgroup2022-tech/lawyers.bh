@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../services/auth_gate.dart';
 import '../theme/app_theme.dart';
-import '../widgets/app_background.dart';
 import '../widgets/brand_logo.dart';
 import '../widgets/sos_button.dart';
 import 'home_screen.dart';
@@ -110,11 +109,12 @@ class _ClientShellState extends State<ClientShell> {
           const Padding(padding: EdgeInsets.only(left: 4), child: SosButton()),
         ],
       ),
-      body: AppBackgroundScope(
-        child: IndexedStack(
-          index: _tabIndex,
-          children: _tabs,
-        ),
+      // The background is painted once, globally, behind the whole app (see
+      // main.dart). This screen only supplies content, so the image is not
+      // repainted — and not covered — here.
+      body: IndexedStack(
+        index: _tabIndex,
+        children: _tabs,
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selected,

@@ -31,3 +31,6 @@ flutter:
     # The square brand seal used in app bars and the sign-in header. Declared
     # individually so the other, unused artwork in this folder is not bundled.
     - assets/images/logo_bh.png
+    # Bundled default background image. Ships in the APK so the global app
+    # background is visible even before an admin configures one, and offline.
+    - assets/images/app_background_default.png

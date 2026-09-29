@@ -72,9 +72,10 @@ class AppState extends ChangeNotifier {
   AppUser? currentUser;
   bool isBootstrapping = true;
 
-  /// The admin-configured app background. Starts at the default so the first
-  /// frame is never blank, then is refreshed from the backend.
-  AppAppearance appAppearance = AppAppearance.defaults;
+  /// The admin-configured app background. Starts with the bundled image so the
+  /// first frame already shows the global background, then is refreshed from
+  /// the backend.
+  AppAppearance appAppearance = AppAppearance.demoBackground;
 
   /// Fetches the background from the backend. Called after bootstrap so the app
   /// has already painted; a failure keeps the current/default value and is

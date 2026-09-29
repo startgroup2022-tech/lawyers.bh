@@ -9,9 +9,13 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:provider/provider.dart';
+
 import 'package:lawyers_bh_client/models/app_appearance.dart';
+import 'package:lawyers_bh_client/providers/app_state.dart';
 import 'package:lawyers_bh_client/services/api_client.dart';
 import 'package:lawyers_bh_client/services/appearance_service.dart';
+import 'package:lawyers_bh_client/theme/app_theme.dart';
 import 'package:lawyers_bh_client/widgets/app_background.dart';
 
 /// Coverage for the admin-controlled app background on the client side.
@@ -78,6 +82,34 @@ void main() {
       );
       expect(restored, original);
     });
+
+    test('falls back to the bundled image when nothing is configured', () {
+      final appearance = AppAppearance.defaults.withVisibleBackground();
+      expect(appearance.usesAssetImage, isTrue);
+      expect(appearance.imageSource, AppAppearance.bundledBackgroundAsset);
+      expect(appearance.hasImage, isTrue);
+      // Low opacity so the content above stays readable.
+      expect(appearance.imageOpacity, greaterThan(0));
+      expect(appearance.imageOpacity, lessThan(1));
+    });
+
+    test('keeps the admin image and never swaps in the bundled one', () {
+      const admin = AppAppearance(
+        backgroundUrl: 'https://cdn.example/bg.webp',
+        imageOpacity: 0.6,
+      );
+      final resolved = admin.withVisibleBackground();
+      expect(resolved.usesAssetImage, isFalse);
+      expect(resolved.imageSource, 'https://cdn.example/bg.webp');
+      expect(resolved, admin);
+    });
+
+    test('keeps the admin colour while filling in the bundled image', () {
+      const admin = AppAppearance(backgroundColor: Color(0xFF082B67));
+      final resolved = admin.withVisibleBackground();
+      expect(resolved.backgroundColor, const Color(0xFF082B67));
+      expect(resolved.usesAssetImage, isTrue);
+    });
   });
 
   group('AppearanceService', () {
@@ -107,13 +139,14 @@ void main() {
       expect(cached, appearance);
     });
 
-    test('falls back to the default on a backend error, never throwing', () async {
+    test('falls back to the bundled background on a backend error, never throwing', () async {
       final service = AppearanceService(ApiClient(
         httpClient: MockClient((_) async => _fail('server_error', 500)),
       ));
 
       final appearance = await service.load();
-      expect(appearance, AppAppearance.defaults);
+      expect(appearance, AppAppearance.demoBackground);
+      expect(appearance.usesAssetImage, isTrue);
     });
 
     test('serves the last cached value when the backend is unreachable', () async {
@@ -167,6 +200,103 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('content'), findsOneWidget);
+    });
+
+    testWidgets('paints the bundled asset image when none is configured', (tester) async {
+      await tester.pumpWidget(wrap(AppAppearance.defaults.withVisibleBackground()));
+      await tester.pump();
+
+      expect(find.byType(Image), findsOneWidget);
+      final image = tester.widget<Image>(find.byType(Image));
+      expect((image.image as AssetImage).assetName,
+          AppAppearance.bundledBackgroundAsset);
+      expect(find.text('content'), findsOneWidget);
+    });
+
+    testWidgets('never lets the background intercept a tap on the content',
+        (tester) async {
+      var tapped = 0;
+      await tester.pumpWidget(MaterialApp(
+        home: AppBackground(
+          appearance: AppAppearance.demoBackground,
+          child: Center(
+            child: ElevatedButton(
+              onPressed: () => tapped++,
+              child: const Text('اضغط'),
+            ),
+          ),
+        ),
+      ));
+      // Let the route transition finish so its own IgnorePointer (a Flutter
+      // page-transition detail) is not what we are measuring.
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(ElevatedButton));
+      expect(tapped, 1);
+    });
+
+    testWidgets('renders no image layer for a plain colour-only appearance',
+        (tester) async {
+      await tester.pumpWidget(wrap(const AppAppearance(
+        backgroundColor: Color(0xFF082B67),
+      )));
+      await tester.pump();
+
+      expect(find.byType(Image), findsNothing);
+      expect(find.text('content'), findsOneWidget);
+    });
+
+    testWidgets('falls back to the bundled background without an AppState',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        builder: (context, child) =>
+            AppBackgroundScope(child: child ?? const SizedBox.shrink()),
+        home: const Scaffold(body: Center(child: Text('content'))),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Image), findsOneWidget);
+      expect(find.text('content'), findsOneWidget);
+    });
+
+    testWidgets('paints the background behind routed content and keeps it tappable',
+        (tester) async {
+      // Mirrors main.dart: the background wraps the navigator, so every route
+      // is content painted on top of the same global background layer.
+      final appState = AppState()
+        ..appAppearance = AppAppearance.defaults.withVisibleBackground();
+      var tapped = 0;
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<AppState>.value(
+          value: appState,
+          child: MaterialApp(
+            theme: buildAppTheme(),
+            builder: (context, child) =>
+                AppBackgroundScope(child: child ?? const SizedBox.shrink()),
+            home: Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () => tapped++,
+                  child: const Text('محتوى'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The global background is the bundled asset, drawn behind the content.
+      final images = find.byType(Image);
+      expect(images, findsOneWidget);
+      expect((tester.widget<Image>(images).image as AssetImage).assetName,
+          AppAppearance.bundledBackgroundAsset);
+
+      // And it is behind: the scaffold's content still receives the tap.
+      expect(find.text('محتوى'), findsOneWidget);
+      await tester.tap(find.byType(ElevatedButton));
+      expect(tapped, 1);
     });
   });
 }
