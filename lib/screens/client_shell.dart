@@ -90,8 +90,10 @@ class _ClientShellState extends State<ClientShell> {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const BrandSeal(size: 30),
-            const SizedBox(width: 9),
+            // The official platform wordmark — the same asset the slider uses —
+            // rather than a separate circular mark.
+            const BrandLogo(height: 20, onDark: true),
+            const SizedBox(width: 10),
             Text(_titles[_selected]),
           ],
         ),

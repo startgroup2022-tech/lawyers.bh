@@ -3,9 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import 'brand_logo.dart';
 
 /// One slide in the home banner. Slides carry brand messaging and a real call to
 /// action only — no invented offers, prices or lawyer data.
+///
+/// [showWordmark] swaps the decorative icon for the official platform wordmark,
+/// so the brand slide uses the exact asset the rest of the app uses.
 class BannerSlide {
   final String title;
   final String subtitle;
@@ -13,6 +17,7 @@ class BannerSlide {
   final List<Color> colors;
   final String actionLabel;
   final VoidCallback onAction;
+  final bool showWordmark;
 
   const BannerSlide({
     required this.title,
@@ -21,6 +26,7 @@ class BannerSlide {
     required this.colors,
     required this.actionLabel,
     required this.onAction,
+    this.showWordmark = false,
   });
 }
 
@@ -33,7 +39,7 @@ class PromoBanner extends StatefulWidget {
   final List<BannerSlide> slides;
   final double height;
 
-  const PromoBanner({super.key, required this.slides, this.height = 132});
+  const PromoBanner({super.key, required this.slides, this.height = 138});
 
   @override
   State<PromoBanner> createState() => _PromoBannerState();
@@ -159,7 +165,8 @@ class _PromoBannerState extends State<PromoBanner> {
                         minimumSize: Size.zero,
                         padding: const EdgeInsets.symmetric(horizontal: 14),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        textStyle: AppTextStyles.cairo(size: 11.5, weight: FontWeight.w700),
+                        textStyle:
+                            AppTextStyles.cairo(size: 11.5, weight: FontWeight.w700),
                       ),
                       icon: const Icon(Icons.arrow_back, size: 14),
                       label: Text(slide.actionLabel),
@@ -172,11 +179,16 @@ class _PromoBannerState extends State<PromoBanner> {
             Container(
               width: 56,
               height: 56,
+              padding: const EdgeInsets.all(11),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.16),
                 shape: BoxShape.circle,
               ),
-              child: Icon(slide.icon, size: 26, color: Colors.white),
+              // The brand slide carries the official platform emblem — the same
+              // asset the splash and sign-in use — instead of a generic icon.
+              child: slide.showWordmark
+                  ? const BrandSeal(size: 34)
+                  : Icon(slide.icon, size: 26, color: Colors.white),
             ),
           ],
         ),

@@ -156,7 +156,7 @@ void main() {
 
       expect(find.text('الدخول كزائر'), findsOneWidget);
       expect(find.text('تسجيل الدخول'), findsWidgets);
-      expect(find.text('حساب جديد'), findsOneWidget);
+      expect(find.text('إنشاء حساب'), findsOneWidget);
     });
 
     testWidgets('shows the session-expired notice when handed one', (tester) async {

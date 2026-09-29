@@ -54,12 +54,15 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
   /// explicit rather than guessed from the credentials.
   bool _lawyerMode = false;
   bool _register = false;
+
+  /// True while the client form is showing the 6-digit email code step (reached
+  /// by both new-account confirmation and password recovery).
   bool _codeSent = false;
 
   /// Password recovery. It is the backend's `mode: 'reset'` flow, not a new
   /// endpoint: the same email-a-code-then-verify sequence as registration, but
-  /// without name/phone. Kept separate from [_register] so the copy and the
-  /// visible fields can differ while the transport stays identical.
+  /// without name/phone. It is an intent reached from the sign-in form, not a
+  /// third tab — [_register] and [_reset] can never both be true.
   bool _reset = false;
   bool _loading = false;
   bool _guestLoading = false;
@@ -92,13 +95,13 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
     });
   }
 
-  /// Switches the client door between sign-in, sign-up and password recovery,
-  /// clearing any in-flight challenge so a code from one flow can never be
-  /// confirmed in another.
-  void _selectMode({bool? register, bool? reset}) {
+  /// Switches the client door between sign-in and sign-up, clearing any
+  /// in-flight challenge so a code from one flow can never be confirmed in
+  /// another. Any recovery state is dropped: the two are mutually exclusive.
+  void _selectMode({bool? register}) {
     setState(() {
       _register = register ?? false;
-      _reset = reset ?? false;
+      _reset = false;
       _codeSent = false;
       _challengeId = null;
       _codeCtrl.clear();
@@ -413,19 +416,22 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final busy = _loading || _guestLoading;
+    // Once the emailed code has been sent the tab row is meaningless: the
+    // screen is mid-flow and only "change details" can undo it.
+    final showClientTabs = !_lawyerMode && !_codeSent;
     return Scaffold(
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) => SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
             child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight - 40),
+              constraints: BoxConstraints(minHeight: constraints.maxHeight - 36),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Row(
                     children: [
-                      const BrandSeal(size: 44),
+                      const BrandSeal(size: 40),
                       const SizedBox(width: 10),
                       Text('محامون البحرين',
                           style: AppTextStyles.cairo(size: 16, weight: FontWeight.w800)),
@@ -434,110 +440,41 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                         onTap: _sosBeforeLogin,
                         borderRadius: BorderRadius.circular(20),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
                               color: AppColors.crimson,
                               borderRadius: BorderRadius.circular(20)),
                           child: Text('SOS',
                               style: AppTextStyles.cairo(
-                                  size: 11, weight: FontWeight.w700, color: Colors.white)),
+                                  size: 11,
+                                  weight: FontWeight.w700,
+                                  color: Colors.white)),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
-                  Container(
-                    padding: const EdgeInsets.all(22),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topRight,
-                        end: Alignment.bottomLeft,
-                        colors: [AppColors.brandRedDark, AppColors.brandRed, Color(0xFF9E1717)],
-                      ),
-                      borderRadius: BorderRadius.circular(AppRadii.lg),
-                      boxShadow: AppShadows.card,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const BrandLogo(height: 30, onDark: true),
-                        const SizedBox(height: 14),
-                        Text('منصّتك القانونية الموثوقة',
-                            style: AppTextStyles.cairo(
-                                size: 19, weight: FontWeight.w800, color: Colors.white)),
-                        const SizedBox(height: 8),
-                        Text(
-                          'سجّل دخولك للوصول إلى حسابك في منصة محامون البحرين.',
-                          style: AppTextStyles.tajawal(
-                              size: 12.5,
-                              color: Colors.white.withValues(alpha: 0.92),
-                              height: 1.7),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 18),
+                  _brandHero(),
+                  const SizedBox(height: 16),
                   if (widget.notice != null) ...[
                     _banner(widget.notice!, AppColors.amberBg, AppColors.amber,
                         Icons.info_outline),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                   ],
-                  if (!_lawyerMode)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _modeTab('تسجيل الدخول', !_register && !_reset,
-                              () => _selectMode()),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _modeTab('حساب جديد', _register,
-                              () => _selectMode(register: true)),
-                        ),
-                      ],
-                    ),
-                  if (!_lawyerMode) const SizedBox(height: 18),
-                  // Recovery reuses the same emailed-code transport and is only
-                  // reachable from the sign-in form.
+                  // Account type (عميل / محامٍ) is the primary, always-visible
+                  // choice; the sign-in / sign-up switch sits under it. Two
+                  // compact segmented controls instead of a stack of cards.
+                  _accountTypeControl(),
+                  const SizedBox(height: 10),
+                  if (showClientTabs) _clientAuthModeControl(),
+                  const SizedBox(height: 16),
                   if (_reset) ...[
                     _banner(
                         'استعادة كلمة المرور: أدخل بريدك وكلمة المرور الجديدة، وراح نرسل لك رمز تحقق.',
                         AppColors.neutralBg,
                         AppColors.neutralInk,
                         Icons.lock_reset_outlined),
-                    const SizedBox(height: 16),
-                  ],
-                  // The professional door is chosen explicitly, because a lawyer
-                  // account and a client account are separate on the platform.
-                  if (!_register && !_reset)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _modeTab('عميل', !_lawyerMode,
-                                () => _selectDoor(lawyer: false)),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _modeTab('محامٍ', _lawyerMode,
-                                () => _selectDoor(lawyer: true)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  if (_register) ...[
-                    _label('الاسم الكامل'),
-                    TextField(
-                      controller: _nameCtrl,
-                      enabled: !_codeSent && !busy,
-                      textInputAction: TextInputAction.next,
-                      style: AppTextStyles.tajawal(size: 15),
-                      decoration: const InputDecoration(
-                        hintText: 'الاسم كما في الهوية',
-                        prefixIcon: Icon(Icons.person_outline, size: 20),
-                      ),
-                    ),
                     const SizedBox(height: 14),
                   ],
                   if (_lawyerMode) ...[
@@ -553,6 +490,20 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                       ),
                     ),
                   ] else ...[
+                    if (_register) ...[
+                      _label('الاسم الكامل'),
+                      TextField(
+                        controller: _nameCtrl,
+                        enabled: !_codeSent && !busy,
+                        textInputAction: TextInputAction.next,
+                        style: AppTextStyles.tajawal(size: 15),
+                        decoration: const InputDecoration(
+                          hintText: 'الاسم كما في الهوية',
+                          prefixIcon: Icon(Icons.person_outline, size: 20),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
                     _label('البريد الإلكتروني'),
                     TextField(
                       controller: _emailCtrl,
@@ -585,7 +536,15 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                     Align(
                       alignment: AlignmentDirectional.centerEnd,
                       child: TextButton(
-                        onPressed: busy ? null : () => _selectMode(reset: true),
+                        onPressed: busy
+                            ? null
+                            : () => setState(() {
+                                  _reset = true;
+                                  _codeSent = false;
+                                  _challengeId = null;
+                                  _codeCtrl.clear();
+                                  _error = null;
+                                }),
                         style: TextButton.styleFrom(
                             minimumSize: Size.zero,
                             padding: const EdgeInsets.symmetric(vertical: 4),
@@ -643,7 +602,8 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                   ],
                   if (_error != null) ...[
                     const SizedBox(height: 10),
-                    _banner(_error!, AppColors.redBg, AppColors.red, Icons.error_outline),
+                    _banner(_error!, AppColors.redBg, AppColors.red,
+                        Icons.error_outline),
                   ],
                   const SizedBox(height: 18),
                   ElevatedButton(
@@ -666,64 +626,204 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                                         : 'إرسال رمز التحقق')
                                     : 'تسجيل الدخول')),
                   ),
-                  if (_codeSent)
+                  if (_codeSent || _reset)
                     TextButton(
                       onPressed: busy
                           ? null
                           : () => setState(() {
+                                // "Change details": step back within the same
+                                // flow (recovery stays in recovery).
                                 _codeSent = false;
                                 _challengeId = null;
                                 _codeCtrl.clear();
                                 _error = null;
                               }),
-                      child: Text('تغيير البيانات',
-                          style: AppTextStyles.tajawal(size: 12, color: AppColors.ink2)),
+                      child: Text(_reset ? 'تعديل البريد' : 'تغيير البيانات',
+                          style: AppTextStyles.tajawal(
+                              size: 12, color: AppColors.ink2)),
                     ),
                   if (!_reset) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Expanded(child: Divider(color: AppColors.line)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        child: Text('أو',
-                            style: AppTextStyles.tajawal(size: 12, color: AppColors.ink3)),
-                      ),
-                      const Expanded(child: Divider(color: AppColors.line)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: busy ? null : _continueAsGuest,
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
-                      side: const BorderSide(color: AppColors.brandRed, width: 1.4),
-                      foregroundColor: AppColors.brandRed,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.sm)),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Expanded(child: Divider(color: AppColors.line)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: Text('أو',
+                              style: AppTextStyles.tajawal(
+                                  size: 12, color: AppColors.ink3)),
+                        ),
+                        const Expanded(child: Divider(color: AppColors.line)),
+                      ],
                     ),
-                    icon: _guestLoading
-                        ? const SizedBox(
-                            height: 16,
-                            width: 16,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: AppColors.brandRed))
-                        : const Icon(Icons.explore_outlined, size: 18),
-                    label: Text('الدخول كزائر',
-                        style: AppTextStyles.cairo(
-                            size: 13.5, weight: FontWeight.w700, color: AppColors.brandRed)),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'يمكنك تصفّح المحامين كزائر، أما الخدمات الخاصة فتحتاج تسجيل دخول.',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.tajawal(
-                        size: 11.5, color: AppColors.ink3, height: 1.6),
-                  ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: busy ? null : _continueAsGuest,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        side: const BorderSide(color: AppColors.brandRed, width: 1.4),
+                        foregroundColor: AppColors.brandRed,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadii.sm)),
+                      ),
+                      icon: _guestLoading
+                          ? const SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: AppColors.brandRed))
+                          : const Icon(Icons.explore_outlined, size: 18),
+                      label: Text('الدخول كزائر',
+                          style: AppTextStyles.cairo(
+                              size: 13.5,
+                              weight: FontWeight.w700,
+                              color: AppColors.brandRed)),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'يمكنك تصفّح المحامين كزائر، أما الخدمات الخاصة فتحتاج تسجيل دخول.',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.tajawal(
+                          size: 11.5, color: AppColors.ink3, height: 1.6),
+                    ),
                   ],
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The compact brand hero: one logo, one line, no slider and no sections.
+  Widget _brandHero() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [AppColors.brandRedDark, AppColors.brandRed, Color(0xFF9E1717)],
+        ),
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const BrandLogo(height: 30, onDark: true),
+          const SizedBox(height: 12),
+          Text('منصّتك القانونية الموثوقة',
+              style: AppTextStyles.cairo(
+                  size: 18, weight: FontWeight.w800, color: Colors.white)),
+          const SizedBox(height: 6),
+          Text(
+            'سجّل دخولك للوصول إلى حسابك في منصة محامون البحرين.',
+            style: AppTextStyles.tajawal(
+                size: 12.5,
+                color: Colors.white.withValues(alpha: 0.92),
+                height: 1.6),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Account type — the platform's two separate doors. A compact segmented
+  /// control, always visible, because it changes what a sign-in even means.
+  Widget _accountTypeControl() {
+    final busy = _loading || _guestLoading;
+    return _segmented(
+      // RTL: the first entry sits on the right.
+      options: const [
+        (label: 'محامٍ', icon: Icons.gavel_outlined),
+        (label: 'عميل', icon: Icons.person_outline),
+      ],
+      selectedIndex: _lawyerMode ? 0 : 1,
+      onSelect: busy ? null : (i) => _selectDoor(lawyer: i == 0),
+    );
+  }
+
+  /// Sign-in vs. sign-up within the client door.
+  Widget _clientAuthModeControl() {
+    final busy = _loading || _guestLoading;
+    return _segmented(
+      options: const [
+        (label: 'تسجيل الدخول', icon: null),
+        (label: 'إنشاء حساب', icon: null),
+      ],
+      selectedIndex: _register ? 1 : 0,
+      onSelect: busy ? null : (i) => _selectMode(register: i == 1),
+    );
+  }
+
+  /// A pill-style segmented control: a light track with the selected segment
+  /// painted in brand red. Small, dense, and the same width as the fields.
+  Widget _segmented({
+    required List<({String label, IconData? icon})> options,
+    required int selectedIndex,
+    required ValueChanged<int>? onSelect,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.neutralBg,
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < options.length; i++)
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(left: i == options.length - 1 ? 0 : 4),
+                child: _segment(
+                  label: options[i].label,
+                  icon: options[i].icon,
+                  selected: i == selectedIndex,
+                  onTap: onSelect == null ? null : () => onSelect(i),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _segment({
+    required String label,
+    required IconData? icon,
+    required bool selected,
+    required VoidCallback? onTap,
+  }) {
+    return Material(
+      color: selected ? AppColors.brandRed : Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadii.sm - 3),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadii.sm - 3),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 6),
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (icon != null) ...[
+                Icon(icon,
+                    size: 15, color: selected ? Colors.white : AppColors.ink2),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.cairo(
+                        size: 12.5,
+                        weight: FontWeight.w700,
+                        color: selected ? Colors.white : AppColors.ink2)),
+              ),
+            ],
           ),
         ),
       ),
@@ -768,27 +868,6 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
               ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _modeTab(String label, bool selected, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadii.sm),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 11),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? AppColors.navy : Colors.white,
-          border: Border.all(color: selected ? AppColors.navy : AppColors.line),
-          borderRadius: BorderRadius.circular(AppRadii.sm),
-        ),
-        child: Text(label,
-            style: AppTextStyles.cairo(
-                size: 13,
-                weight: FontWeight.w700,
-                color: selected ? Colors.white : AppColors.ink2)),
       ),
     );
   }

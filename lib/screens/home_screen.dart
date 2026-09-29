@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/lawyer.dart';
+import '../models/user.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
-import '../widgets/brand_logo.dart';
 import '../widgets/lawyer_row.dart';
 import '../widgets/promo_banner.dart';
 import '../widgets/section_card.dart';
@@ -14,14 +14,19 @@ import 'lawyer_profile_screen.dart';
 
 /// The client home.
 ///
-/// Order, per the platform brief: welcome header → banner → **main sections** →
-/// featured lawyers. The banner is kept short so the sections stay above the
-/// fold.
+/// Order, per the platform brief: branded header → **one** animated slider →
+/// main categories → services → featured lawyers.
 ///
-/// Every section maps to a real destination. A capability the mobile API does
-/// not expose (voice consultation, appointments, emergency dispatch, payments)
-/// is shown as "قريبًا" and explains the gap when tapped rather than opening a
-/// fabricated screen or inventing data.
+/// The header carries the official platform wordmark (the same asset the slider
+/// and the splash use), not a separate circular mark.
+///
+/// Sections are **navigation/categories** — the persistent structure of the app
+/// (lawyers, specialisations, consultations, contracts). Bookable offerings
+/// (voice consultation, video consultation, appointments, emergency dispatch)
+/// are **services**, shown in their own strip below the categories, never mixed
+/// into the category grid. A capability with no mobile endpoint is tagged
+/// "قريبًا" and explains the gap when tapped rather than opening a fabricated
+/// screen.
 class HomeScreen extends StatefulWidget {
   final VoidCallback onBrowseAll;
   const HomeScreen({super.key, required this.onBrowseAll});
@@ -59,7 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
         .push(MaterialPageRoute(builder: (_) => LawyerProfileScreen(lawyer: lawyer)));
   }
 
-  /// A section the app cannot open yet. It says so plainly instead of routing
+  /// A capability the app cannot open yet. It says so plainly instead of routing
   /// nowhere.
   void _unavailable(String feature) {
     ScaffoldMessenger.of(context)
@@ -69,8 +74,9 @@ class _HomeScreenState extends State<HomeScreen> {
       );
   }
 
-  List<HomeSection> _sections() {
-    final professional = context.read<AppState>().isProfessional;
+  /// Navigation categories — the app's real structure. Only destinations that
+  /// exist are listed; nothing is invented to fill the grid.
+  List<HomeSection> _categories() {
     return [
       HomeSection(
         label: 'المحامون',
@@ -85,39 +91,47 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: widget.onBrowseAll,
       ),
       HomeSection(
-        label: 'الاستشارة الصوتية',
-        icon: Icons.mic_none_outlined,
-        tint: AppColors.brandBlue,
-        available: false,
-        onTap: () => _unavailable('الاستشارة الصوتية'),
-      ),
-      HomeSection(
-        label: 'حجز موعد',
-        icon: Icons.event_available_outlined,
-        tint: AppColors.brandBlue,
-        available: false,
-        onTap: () => _unavailable('حجز موعد'),
-      ),
-      HomeSection(
         label: 'الخدمات القانونية',
         icon: Icons.assignment_outlined,
         tint: AppColors.brandBlue,
         onTap: widget.onBrowseAll,
       ),
       HomeSection(
+        label: 'التعاقد والدفع',
+        icon: Icons.description_outlined,
+        tint: AppColors.brandBlue,
+        onTap: widget.onBrowseAll,
+      ),
+    ];
+  }
+
+  /// Services/actions — bookable offerings, kept out of the category grid.
+  List<ServiceItem> _services() {
+    return [
+      ServiceItem(
+        label: 'استشارة صوتية',
+        icon: Icons.mic_none_outlined,
+        available: false,
+        onTap: () => _unavailable('الاستشارة الصوتية'),
+      ),
+      ServiceItem(
+        label: 'استشارة مرئية',
+        icon: Icons.videocam_outlined,
+        available: false,
+        onTap: () => _unavailable('الاستشارة المرئية'),
+      ),
+      ServiceItem(
+        label: 'حجز موعد',
+        icon: Icons.event_available_outlined,
+        available: false,
+        onTap: () => _unavailable('حجز موعد'),
+      ),
+      ServiceItem(
         label: 'النجدة العاجلة',
         icon: Icons.emergency_outlined,
-        tint: AppColors.brandRed,
         available: false,
         onTap: () => _unavailable('النجدة العاجلة'),
       ),
-      if (professional)
-        HomeSection(
-          label: 'لوحة المحامي',
-          icon: Icons.workspace_premium_outlined,
-          tint: AppColors.brandRed,
-          onTap: () => Navigator.of(context).popUntil((r) => r.isFirst),
-        ),
     ];
   }
 
@@ -128,19 +142,22 @@ class _HomeScreenState extends State<HomeScreen> {
         onRefresh: _reload,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
           children: [
-            _welcomeHeader(),
-            const SizedBox(height: 16),
+            _header(),
+            const SizedBox(height: 14),
+            // One animated carousel only — two slides inside it, no second
+            // static banner.
             PromoBanner(
               slides: [
                 BannerSlide(
                   title: 'منصّتك القانونية الموثوقة',
-                  subtitle: 'محامون معتمدون في مملكة البحرين، بخبرات موثّقة.',
+                  subtitle: 'محامون معتمدون في مملكة البحرين.',
                   icon: Icons.verified_outlined,
                   colors: const [AppColors.brandRedDark, AppColors.brandRed],
                   actionLabel: 'ابحث عن محامٍ',
                   onAction: widget.onBrowseAll,
+                  showWordmark: true,
                 ),
                 BannerSlide(
                   title: 'تصفّح حسب التخصص',
@@ -152,10 +169,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            // Main sections, directly under the banner.
+            const SizedBox(height: 18),
+            // Main categories, directly under the slider.
             const SectionTitle(title: 'الأقسام الرئيسية'),
-            SectionGrid(sections: _sections()),
+            SectionGrid(sections: _categories()),
+            const SizedBox(height: 18),
+            // Services live apart from the categories.
+            const SectionTitle(title: 'الخدمات'),
+            ServicesStrip(services: _services()),
             const SizedBox(height: 22),
             SectionTitle(
               title: 'محامون موصى بهم',
@@ -196,33 +217,20 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _welcomeHeader() {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [AppColors.navy, Color(0xFF132644), AppColors.brandRed],
-        ),
-        borderRadius: BorderRadius.circular(AppRadii.lg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const BrandLogo(height: 24, onDark: true),
-          const SizedBox(height: 12),
-          Text('منصّتك القانونية الموثوقة',
-              style: AppTextStyles.cairo(
-                  size: 17, weight: FontWeight.w800, color: Colors.white)),
-          const SizedBox(height: 6),
-          Text(
-            'ابحث عن محامٍ معتمد في مملكة البحرين، وتعرّف على خدماتهم قبل التواصل.',
-            style: AppTextStyles.tajawal(
-                size: 12, color: const Color(0xFFC9D3E4), height: 1.6),
-          ),
-        ],
-      ),
+  /// A welcome header. The platform wordmark itself lives in the app bar above
+  /// (the real header), so this does not repeat it.
+  Widget _header() {
+    final user = context.select<AppState, AppUser?>((s) => s.currentUser);
+    final name = user?.displayName.trim() ?? '';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(name.isEmpty ? 'أهلًا بك' : 'أهلًا $name',
+            style: AppTextStyles.cairo(size: 17, weight: FontWeight.w800)),
+        const SizedBox(height: 2),
+        Text('ابحث عن محامٍ معتمد وابدأ استشارتك.',
+            style: AppTextStyles.tajawal(size: 12, color: AppColors.ink2)),
+      ],
     );
   }
 }

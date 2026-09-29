@@ -15,6 +15,7 @@ import 'package:lawyers_bh_client/screens/home_screen.dart';
 import 'package:lawyers_bh_client/screens/lawyer_profile_screen.dart';
 import 'package:lawyers_bh_client/screens/login_otp_screen.dart';
 import 'package:lawyers_bh_client/services/api_client.dart';
+import 'package:lawyers_bh_client/widgets/promo_banner.dart';
 
 /// Widget coverage for the UX pass: the home section grid, the lawyer profile
 /// presentation, and the password-recovery entry on the sign-in form.
@@ -54,10 +55,10 @@ Widget _wrap(AppState app, Widget child) => ChangeNotifierProvider<AppState>.val
 
 void main() {
   group('home screen layout', () {
-    testWidgets('renders main sections under the banner, with honest gaps',
+    testWidgets('renders categories under the single slider, services apart',
         (tester) async {
       // A tall logical window so the lazy ListView builds every section below
-      // the banner without needing to scroll.
+      // the slider without needing to scroll.
       tester.view.physicalSize = const Size(1200, 3400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -65,18 +66,28 @@ void main() {
 
       await tester.pumpWidget(
           _wrap(_state(), Scaffold(body: HomeScreen(onBrowseAll: () {}))));
-      // Explicit pumps: the banner auto-advances on a timer, so pumpAndSettle
+      // Explicit pumps: the slider auto-advances on a timer, so pumpAndSettle
       // would never settle.
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      // Sections sit directly under the banner.
+      // Exactly one carousel on the home page.
+      expect(find.byType(PromoBanner), findsOneWidget);
+      expect(find.byType(PageView), findsOneWidget);
+
+      // Main categories sit directly under the slider and are navigation
+      // destinations, not services.
       expect(find.text('الأقسام الرئيسية'), findsOneWidget);
       expect(find.text('المحامون'), findsOneWidget);
       expect(find.text('الاستشارات القانونية'), findsOneWidget);
-      expect(find.text('الاستشارة الصوتية'), findsOneWidget);
-      expect(find.text('حجز موعد'), findsOneWidget);
       expect(find.text('الخدمات القانونية'), findsOneWidget);
+      expect(find.text('التعاقد والدفع'), findsOneWidget);
+
+      // Voice/video/booking are services, in their own section.
+      expect(find.text('الخدمات'), findsOneWidget);
+      expect(find.text('استشارة صوتية'), findsOneWidget);
+      expect(find.text('استشارة مرئية'), findsOneWidget);
+      expect(find.text('حجز موعد'), findsOneWidget);
 
       // Capabilities without a backend route are marked, not faked.
       expect(find.text('قريبًا'), findsWidgets);
@@ -86,14 +97,19 @@ void main() {
       expect(find.text('محمد ناجي'), findsOneWidget);
     });
 
-    testWidgets('an unavailable section explains itself instead of navigating',
+    testWidgets('an unavailable service explains itself instead of navigating',
         (tester) async {
+      tester.view.physicalSize = const Size(1200, 3400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       await tester.pumpWidget(
           _wrap(_state(), Scaffold(body: HomeScreen(onBrowseAll: () {}))));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      await tester.tap(find.text('الاستشارة الصوتية'));
+      await tester.tap(find.text('استشارة صوتية'));
       await tester.pump();
       expect(find.textContaining('غير متاح في التطبيق'), findsOneWidget);
     });
@@ -133,6 +149,11 @@ void main() {
 
     testWidgets('a lawyer without contact data shows an empty note, not blanks',
         (tester) async {
+      tester.view.physicalSize = const Size(1200, 3400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       await tester.pumpWidget(MaterialApp(
           home: LawyerProfileScreen(
               lawyer: Lawyer(id: 'x', name: 'بلا بيانات'))));

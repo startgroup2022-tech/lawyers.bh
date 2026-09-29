@@ -9,11 +9,17 @@ import '../theme/app_theme.dart';
 /// The directory endpoint (`GET /api/mobile/lawyers`) publishes identity and
 /// contact fields only: name (Arabic + English), phone, email, status and
 /// subscription type. The platform exposes **no** per-lawyer detail route, so
-/// there is no rating, bio, experience, fee, city or availability to show here —
-/// and this screen does not invent any. It presents the real fields
-/// professionally and gives the two contact actions that actually work (call
-/// and email). Actions that would need a backend route the mobile API does not
-/// expose (voice consultation, booking) are shown as unavailable and say so.
+/// there is no photo, specialisation, experience, bio, language, city,
+/// qualification or rating to show — and this screen invents none of them.
+///
+/// What it does instead of hiding those fields: it lays out the professional
+/// profile in full and, for every field the API cannot fill, shows the field
+/// with an explicit "غير متاح من الـ API" marker. The reader sees the real
+/// shape of a lawyer profile and exactly which parts are missing and why.
+///
+/// The two prominent actions are voice consultation and booking. Neither has a
+/// backend route, so both say so rather than opening a fabricated flow. The
+/// contact actions that *do* work (copy phone / email) are wired for real.
 class LawyerProfileScreen extends StatelessWidget {
   final Lawyer lawyer;
   const LawyerProfileScreen({super.key, required this.lawyer});
@@ -46,12 +52,10 @@ class LawyerProfileScreen extends StatelessWidget {
       ..showSnackBar(SnackBar(content: Text('تم نسخ $label')));
   }
 
-  void _unavailable(BuildContext context, String feature) {
+  void _unavailable(BuildContext context, String feature, String reason) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text('«$feature» غير متاح في التطبيق حاليًا.')),
-      );
+      ..showSnackBar(SnackBar(content: Text('«$feature» $reason')));
   }
 
   @override
@@ -62,17 +66,20 @@ class LawyerProfileScreen extends StatelessWidget {
         slivers: [
           _header(context),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 _identityCard(),
                 const SizedBox(height: 16),
                 _primaryActions(context),
                 const SizedBox(height: 18),
+                _sectionTitle('المعلومات المهنية'),
+                _professionalCard(),
+                const SizedBox(height: 18),
                 _sectionTitle('معلومات التواصل'),
                 _contactCard(context),
                 const SizedBox(height: 18),
-                _sectionTitle('الخدمات'),
+                _sectionTitle('الخدمات التي يقدّمها'),
                 _servicesCard(context),
                 const SizedBox(height: 16),
                 _profileDataNotice(),
@@ -119,27 +126,51 @@ class LawyerProfileScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Center(
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: CircleAvatar(
-                    radius: 38,
-                    backgroundColor: Colors.white,
-                    child: Text(lawyer.initials,
-                        style: AppTextStyles.cairo(
-                            size: 24, weight: FontWeight.w800, color: AppColors.navy)),
-                  ),
+                child: Stack(
+                  alignment: Alignment.bottomCenter,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      // No photo is published by the API, so the avatar is the
+                      // lawyer's real initials — never a stock face.
+                      child: CircleAvatar(
+                        radius: 40,
+                        backgroundColor: Colors.white,
+                        child: Text(lawyer.initials,
+                            style: AppTextStyles.cairo(
+                                size: 26,
+                                weight: FontWeight.w800,
+                                color: AppColors.navy)),
+                      ),
+                    ),
+                    Transform.translate(
+                      offset: const Offset(0, 10),
+                      child: Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.neutralBg,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.line),
+                        ),
+                        child: Text('لا تتوفر صورة من الـ API',
+                            style: AppTextStyles.tajawal(
+                                size: 9, color: AppColors.ink2)),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 20),
               Center(
                 child: Text(lawyer.name,
                     textAlign: TextAlign.center,
                     style: AppTextStyles.cairo(
-                        size: 18, weight: FontWeight.w800, color: Colors.white)),
+                        size: 19, weight: FontWeight.w800, color: Colors.white)),
               ),
               if ((lawyer.nameEn ?? '').isNotEmpty) ...[
                 const SizedBox(height: 4),
@@ -191,7 +222,8 @@ class LawyerProfileScreen extends StatelessWidget {
     );
   }
 
-  /// Pulls the header up over the gradient for a layered, professional look.
+  /// Pulls the identity card up over the gradient for a layered, professional
+  /// look, and lists the fields that exist versus those the API withholds.
   Widget _identityCard() {
     return Transform.translate(
       offset: const Offset(0, -26),
@@ -224,24 +256,30 @@ class LawyerProfileScreen extends StatelessWidget {
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () => _unavailable(context, 'الاستشارة الصوتية'),
+                onPressed: () => _unavailable(
+                    context,
+                    'الاستشارة الصوتية',
+                    'تحتاج واجهة استشارة صوتية غير متاحة في الـ API الحالي.'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.brandBlue,
-                  minimumSize: const Size.fromHeight(50),
+                  minimumSize: const Size.fromHeight(52),
                 ),
-                icon: const Icon(Icons.mic_none_outlined, size: 19),
+                icon: const Icon(Icons.mic_none_outlined, size: 20),
                 label: const Text('استشارة صوتية'),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () => _unavailable(context, 'حجز موعد'),
+                onPressed: () => _unavailable(
+                    context,
+                    'حجز موعد',
+                    'يحتاج واجهات التوفر والحجز غير المتاحة في الـ API الحالي.'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.brandRed,
-                  minimumSize: const Size.fromHeight(50),
+                  minimumSize: const Size.fromHeight(52),
                 ),
-                icon: const Icon(Icons.event_available_outlined, size: 19),
+                icon: const Icon(Icons.event_available_outlined, size: 20),
                 label: const Text('حجز موعد'),
               ),
             ),
@@ -254,6 +292,33 @@ class LawyerProfileScreen extends StatelessWidget {
           style: AppTextStyles.tajawal(size: 11, color: AppColors.ink3, height: 1.5),
         ),
       ],
+    );
+  }
+
+  /// The professional profile laid out in full. Fields the mobile API does not
+  /// publish are shown with an explicit marker rather than omitted, so the
+  /// reader can tell a missing backend field from a lawyer who simply has none.
+  Widget _professionalCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.line),
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _row(Icons.work_outline, 'المسمى المهني', _roleLabel),
+          _unavailableRow(Icons.category_outlined, 'التخصصات القانونية'),
+          _unavailableRow(Icons.timeline_outlined, 'سنوات الخبرة'),
+          _unavailableRow(Icons.article_outlined, 'نبذة مهنية'),
+          _unavailableRow(Icons.translate_outlined, 'اللغات'),
+          _unavailableRow(Icons.location_city_outlined, 'المدينة / المكتب'),
+          _unavailableRow(Icons.school_outlined, 'المؤهلات'),
+          _unavailableRow(Icons.star_border, 'التقييمات'),
+        ],
+      ),
     );
   }
 
@@ -350,12 +415,13 @@ class LawyerProfileScreen extends StatelessWidget {
   }
 
   Widget _servicesCard(BuildContext context) {
-    final services = <({String label, IconData icon, bool available})>[
-      (label: 'استشارة قانونية', icon: Icons.chat_bubble_outline, available: false),
-      (label: 'استشارة صوتية', icon: Icons.mic_none_outlined, available: false),
-      (label: 'حجز موعد', icon: Icons.event_available_outlined, available: false),
+    final services = <({String label, IconData icon})>[
+      (label: 'استشارة قانونية', icon: Icons.chat_bubble_outline),
+      (label: 'استشارة صوتية', icon: Icons.mic_none_outlined),
+      (label: 'استشارة مرئية', icon: Icons.videocam_outlined),
+      (label: 'حجز موعد', icon: Icons.event_available_outlined),
       if (lawyer.isEmergencyReady)
-        (label: 'نجدة قانونية عاجلة', icon: Icons.emergency_outlined, available: false),
+        (label: 'نجدة قانونية عاجلة', icon: Icons.emergency_outlined),
     ];
     return Container(
       padding: const EdgeInsets.all(6),
@@ -418,7 +484,8 @@ class LawyerProfileScreen extends StatelessWidget {
           Expanded(
             child: Text(
               'يعرض هذا الملف البيانات المنشورة للمحامي على المنصة (الاسم، الصفة، وسائل التواصل). '
-              'النبذة والتخصصات والتقييمات والمواعيد تتطلّب واجهة تفاصيل محامٍ غير متاحة في الـ API الحالي.',
+              'الحقول المعلّمة بـ «غير متاح من الـ API» — الصورة والتخصصات والخبرة والنبذة واللغات والمدينة والمؤهلات والتقييمات — '
+              'تحتاج واجهة تفاصيل محامٍ غير موجودة في الـ API الحالي.',
               style: AppTextStyles.tajawal(size: 11.5, color: AppColors.ink2, height: 1.7),
             ),
           ),
@@ -461,6 +528,35 @@ class LawyerProfileScreen extends StatelessWidget {
           Expanded(
             child: Text(value,
                 style: AppTextStyles.tajawal(size: 12.5, color: AppColors.navy)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// A professional field the mobile API does not publish. The label stays, the
+  /// value is replaced by an explicit marker — a gap the reader can see.
+  Widget _unavailableRow(IconData icon, String label) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 17, color: AppColors.ink3),
+          const SizedBox(width: 10),
+          Text('$label: ',
+              style: AppTextStyles.tajawal(
+                  size: 12.5, weight: FontWeight.w600, color: AppColors.ink2)),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.neutralBg,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text('غير متاح من الـ API',
+                  style: AppTextStyles.tajawal(size: 10.5, color: AppColors.ink3)),
+            ),
           ),
         ],
       ),
