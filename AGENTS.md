@@ -30,6 +30,11 @@ flutter test --dart-define=API_BASE_URL=https://www.lawyers.bh test/backend_inte
 
 `android/` and `ios/` are intentionally absent; Codemagic's workflows run
 `flutter create --platforms=android,ios` before building. Do not commit them.
+`tool/prepare_android_platform.py` reapplies what `flutter create` cannot know:
+the INTERNET permission, the official «محامون البحرين» launcher label, the
+official launcher icon (brand-red tile + BH seal, adaptive on API 26+), and the
+branded launch window. The pre-rendered icons live in `tool/android_branding/`
+and are copied in, so the build needs no image tooling.
 
 ## The API (verified live, 2026-09)
 
@@ -207,7 +212,11 @@ POST is authoritative and the screen refreshes its slot list.
   red identity, not a separate navy/gold one. `BadgeTone` is
   `{ green, neutral, amber, red }`.
 - The official mark is bundled under `assets/brand/` and rendered through
-  `widgets/brand_logo.dart` (`BrandLogo` / `BrandSeal`).
+  `widgets/brand_logo.dart` (`BrandLogo` / `BrandSeal`). The square BH seal
+  (`assets/images/logo_bh.png`, identical to the website's `logo-BH.png`) is the
+  source for the Android launcher icon, and `assets/brand/logo_white.png` for the
+  native launch window; the app name is «محامون البحرين» everywhere (in-app
+  `MaterialApp.title` and the Android `android:label`).
 - Role routing lives in `lib/screens/root_shell.dart`, driven by
   `AppState.isProfessional`. A mobile client is never professional, so a client
   always lands in `ClientShell`.

@@ -36,7 +36,7 @@ workflows:
           if [ ! -d "android" ]; then
             flutter create --platforms=android,ios --org com.superai.lawyersbh --project-name lawyers_bh_client .
           fi
-      - name: Apply Android platform tweaks (INTERNET permission, red launch)
+      - name: Apply Android platform tweaks (INTERNET permission, official branding, launch window)
         script: python3 tool/prepare_android_platform.py
       - name: Remove the flutter create template test
         script: |
@@ -92,7 +92,7 @@ workflows:
           if [ ! -d "android" ]; then
             flutter create --platforms=android,ios --org com.superai.lawyersbh --project-name lawyers_bh_client .
           fi
-      - name: Apply Android platform tweaks (INTERNET permission, red launch)
+      - name: Apply Android platform tweaks (INTERNET permission, official branding, launch window)
         script: python3 tool/prepare_android_platform.py
       - name: Remove the flutter create template test
         script: |
