@@ -31,13 +31,20 @@ flutter run
 
 ## 2) اربط التطبيق بالباكند
 
-افتح `lib/services/api_client.dart` وغيّر:
+التطبيق يقرأ رابط الباكند من `API_BASE_URL` وقت البناء (dart-define)، والافتراضي هو
+الإنتاج `https://www.lawyers.bh`. واجهة الموبايل نفسها جزء من نشر الموقع — ما فيه مضيف
+API منفصل (`api.lawyers.bh` ما يُحلّ أصلًا):
 
-```dart
-static const String baseUrl = 'https://api.lawyers.bh';
+```bash
+# بيئة الاختبار (TEST)
+flutter run --dart-define=API_BASE_URL=https://test.lawyers.bh
+
+# الإنتاج (الافتراضي إذا ما مرّرت شي)
+flutter build apk --release
 ```
 
-بالرابط الفعلي لباكندك (راجع `backend/README.md`).
+ما فيه بيانات وهمية داخل التطبيق: الأسعار والمحامون والمواعيد كلها تُقرأ من الباكند، فأي
+تغيير في لوحة الإدارة يظهر في التطبيق بدون إعادة بناء.
 
 ## 3) تفعيل الدفع الحقيقي (اختياري لهذه المرحلة)
 
@@ -144,8 +151,16 @@ debug كالمعتاد.
 ```bash
 flutter pub get
 flutter analyze                 # يجب أن ينتهي بـ "No issues found!"
+flutter test                    # اختبارات دون اتصال؛ الاختبارات الحيّة تُتخطّى بدون API_BASE_URL
 flutter build apk --debug       # نفس ناتج Workflow الأول
 flutter build apk --release     # نفس ناتج Workflow الثاني (موقّع فقط لو ضبطت متغيّرات CM_)
+```
+
+للتحقق من العقد الحقيقي مقابل بيئة الاختبار:
+
+```bash
+flutter test --dart-define=API_BASE_URL=https://test.lawyers.bh test/api_contract_test.dart
+flutter test --dart-define=API_BASE_URL=https://test.lawyers.bh test/backend_integration_test.dart
 ```
 
 ## 8) الهوية الرسمية (الأيقونة والاسم وشاشة الإقلاع)

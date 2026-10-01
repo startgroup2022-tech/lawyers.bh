@@ -222,6 +222,28 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Deletes the signed-in client's account (`DELETE /auth/account`).
+  ///
+  /// Unlike [logout] this is destructive, so it is **not** best-effort: a
+  /// failure propagates to the caller and the session is left intact, rather
+  /// than clearing local state for an account the server still holds. On
+  /// success the account is gone, so the local session is cleared exactly as
+  /// logout does it. A lawyer account has no client route and is rejected
+  /// before any request is made.
+  Future<void> deleteAccount() async {
+    if (currentUser == null) return;
+    if (currentUser!.kind == AccountKind.lawyer) {
+      throw ApiException.featureUnavailable(
+        'حذف حساب المحامي غير متاح من التطبيق',
+      );
+    }
+    await auth.deleteAccount();
+    final prefs = await SharedPreferences.getInstance();
+    await _clearSession(prefs);
+    sessionExpired = false;
+    notifyListeners();
+  }
+
   bool get isLoggedIn => currentUser != null;
 
   /// Set when the backend rejected the session mid-use (a 401 on any call).

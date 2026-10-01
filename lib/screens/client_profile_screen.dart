@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/app_state.dart';
+import '../services/api_client.dart';
 import '../services/auth_gate.dart';
 import '../theme/app_theme.dart';
 import '../widgets/brand_logo.dart';
@@ -163,10 +164,84 @@ class ClientProfileScreen extends StatelessWidget {
               icon: const Icon(Icons.logout, size: 17),
               label: const Text('تسجيل الخروج'),
             ),
+            const SizedBox(height: 10),
+            TextButton.icon(
+              style: TextButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+                foregroundColor: AppColors.ink2,
+              ),
+              onPressed: () => _confirmDeleteAccount(context),
+              icon: const Icon(Icons.delete_outline, size: 17),
+              label: const Text('حذف الحساب'),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  /// Two-step confirmation, then the real `DELETE /auth/account`.
+  ///
+  /// Deletion is irreversible, so it is asked twice and the second dialog
+  /// states plainly what is lost. The call is not best-effort: if the backend
+  /// refuses, the error is surfaced and the session is left untouched.
+  Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final first = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('حذف الحساب',
+            style: AppTextStyles.cairo(size: 15, weight: FontWeight.w800)),
+        content: Text(
+          'سيتم حذف حسابك وبياناته نهائيًا. لا يمكن التراجع عن هذا الإجراء.',
+          style: AppTextStyles.tajawal(size: 12.5, height: 1.7),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('متابعة'),
+          ),
+        ],
+      ),
+    );
+    if (first != true || !context.mounted) return;
+
+    final second = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('تأكيد الحذف',
+            style: AppTextStyles.cairo(size: 15, weight: FontWeight.w800)),
+        content: Text(
+          'سيتم إنهاء جلستك فورًا ولن تستطيع تسجيل الدخول بهذا الحساب مرة أخرى.',
+          style: AppTextStyles.tajawal(size: 12.5, height: 1.7),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('تراجع')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('حذف نهائي'),
+          ),
+        ],
+      ),
+    );
+    if (second != true || !context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await context.read<AppState>().deleteAccount();
+      // The shell shows login once there is no signed-in user, so nothing more
+      // is needed here.
+    } on ApiException catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(e.message ?? 'تعذّر حذف الحساب')),
+      );
+    }
   }
 
   Widget _row(IconData icon, String label, String value) => Row(

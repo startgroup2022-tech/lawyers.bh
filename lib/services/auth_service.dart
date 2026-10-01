@@ -69,6 +69,13 @@ class AuthService {
   /// Ends the session server-side (`DELETE`, bearer token).
   Future<void> logout() => api.delete('/api/mobile/client-auth/session');
 
+  /// Deletes the client account itself (`DELETE`, bearer token).
+  ///
+  /// Distinct from [logout]: logout revokes the session, this removes the
+  /// account and its data. The backend is the source of truth — the app only
+  /// clears its local session once the server has confirmed the deletion.
+  Future<void> deleteAccount() => api.delete('/api/mobile/client-auth/account');
+
   /// Updates name and phone (`PATCH`, bearer token).
   Future<AppUser> updateProfile({required String fullName, required String phone}) async {
     final data = await api.patch('/api/mobile/client-auth/account', {

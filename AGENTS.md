@@ -63,6 +63,7 @@ Sign-in is **email + password**. Account creation and password reset use a
 | `/session` | GET | bearer → `{ok, client}`; no/invalid token → `401 {ok:false,error:'unauthorized'}` |
 | `/session` | DELETE | bearer → `{ok:true}` (logout) |
 | `/account` | PATCH | `{fullName, phone}` → `{ok, client}` |
+| `/account` | DELETE | bearer → `{ok:true}` (delete the account; the profile screen confirms twice) |
 | `/password` | PATCH | `{currentPassword, newPassword}` |
 
 `client` = `{id (UUID), email, fullName, phone}` — that is the whole mobile

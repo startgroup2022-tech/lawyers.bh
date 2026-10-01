@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:lawyers_bh_client/models/user.dart';
 import 'package:lawyers_bh_client/providers/app_state.dart';
+import 'package:lawyers_bh_client/screens/client_profile_screen.dart';
 import 'package:lawyers_bh_client/screens/client_shell.dart';
 import 'package:lawyers_bh_client/screens/login_otp_screen.dart';
 import 'package:lawyers_bh_client/screens/lawyer_shell.dart';
@@ -399,6 +400,116 @@ void main() {
       expect(prefs.getString('auth_token'), isNull);
       expect(prefs.getString('account_kind'), isNull);
       expect(prefs.getBool('guest_mode'), isTrue);
+    });
+
+    test('account deletion hits the real route and clears the session', () async {
+      SharedPreferences.setMockInitialValues(
+          {'auth_token': 'client-token', 'account_kind': 'client'});
+      final calls = <String>[];
+      final app = AppState(
+        apiClient: ApiClient(httpClient: MockClient((req) async {
+          calls.add('${req.method} ${req.url.path}');
+          return okJson({'ok': true});
+        })),
+      );
+      app.currentUser = AppUser(
+          id: 'C1', phone: '+97339000001', kind: AccountKind.client);
+
+      await app.deleteAccount();
+
+      expect(calls, contains('DELETE /api/mobile/client-auth/account'));
+      expect(app.currentUser, isNull);
+      expect(app.isLoggedIn, isFalse);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('auth_token'), isNull);
+      expect(prefs.getString('account_kind'), isNull);
+    });
+
+    test('a refused account deletion keeps the session intact', () async {
+      SharedPreferences.setMockInitialValues(
+          {'auth_token': 'client-token', 'account_kind': 'client'});
+      final app = AppState(
+        apiClient: ApiClient(
+          httpClient: MockClient((_) async => http.Response(
+                jsonEncode({'ok': false, 'error': 'server_error'}),
+                500,
+                headers: {'content-type': 'application/json'},
+              )),
+        ),
+      );
+      app.currentUser = AppUser(
+          id: 'C1', phone: '+97339000001', kind: AccountKind.client);
+
+      // Destructive calls are not best-effort: the failure must surface rather
+      // than leaving the user signed out of an account that still exists.
+      await expectLater(app.deleteAccount(), throwsA(isA<ApiException>()));
+      expect(app.currentUser, isNotNull);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('auth_token'), 'client-token');
+    });
+
+    test('a lawyer account cannot be deleted through the client route', () async {
+      SharedPreferences.setMockInitialValues(
+          {'auth_token': 'lawyer-token', 'account_kind': 'lawyer'});
+      final calls = <String>[];
+      final app = AppState(
+        apiClient: ApiClient(httpClient: MockClient((req) async {
+          calls.add(req.url.path);
+          return okJson({'ok': true});
+        })),
+      );
+      app.currentUser = AppUser(
+          id: 'L1', phone: '+97339000002', kind: AccountKind.lawyer, role: 'lawyer');
+
+      await expectLater(
+        app.deleteAccount(),
+        throwsA(isA<ApiException>()
+            .having((e) => e.error, 'error', 'feature_not_available')),
+      );
+      expect(calls, isEmpty, reason: 'no request for a door with no delete route');
+    });
+
+    testWidgets('the profile offers account deletion behind a confirmation',
+        (tester) async {
+      SharedPreferences.setMockInitialValues(
+          {'auth_token': 'client-token', 'account_kind': 'client'});
+      final calls = <String>[];
+      final app = AppState(
+        apiClient: ApiClient(httpClient: MockClient((req) async {
+          calls.add('${req.method} ${req.url.path}');
+          return okJson({'ok': true});
+        })),
+      );
+      app.currentUser = AppUser(
+          id: 'C1', phone: '+97339000001', kind: AccountKind.client);
+
+      await tester.pumpWidget(ChangeNotifierProvider<AppState>.value(
+        value: app,
+        child: const MaterialApp(home: ClientProfileScreen()),
+      ));
+      await tester.pump();
+
+      await tester.tap(find.text('حذف الحساب'));
+      await tester.pumpAndSettle();
+      expect(find.text('سيتم حذف حسابك وبياناته نهائيًا. لا يمكن التراجع عن هذا الإجراء.'),
+          findsOneWidget);
+
+      // Backing out of the first dialog must not delete anything.
+      await tester.tap(find.text('إلغاء'));
+      await tester.pumpAndSettle();
+      expect(calls, isEmpty);
+      expect(app.isLoggedIn, isTrue);
+
+      // Confirming twice performs the deletion.
+      await tester.tap(find.text('حذف الحساب'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('متابعة'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('حذف نهائي'));
+      await tester.pumpAndSettle();
+
+      expect(calls, contains('DELETE /api/mobile/client-auth/account'));
+      expect(app.isLoggedIn, isFalse);
     });
 
     testWidgets('the login screen offers a lawyer door that asks for a licence',
